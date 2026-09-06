@@ -4,10 +4,10 @@
   "codeowners": ["@yuval_mejahez"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/rt400/Jewish-Sabbaths-Holidays",
+  "documentation": "https://github.com/rt400/Hebcal-Jewish-Calendar",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/rt400/Jewish-Sabbaths-Holidays/issues",
+  "issue_tracker": "https://github.com/rt400/Hebcal-Jewish-Calendar/issues",
   "requirements": ["aiofiles", "aiozoneinfo", "hdate==1.1.2"],
-  "version": "5.0.0"
+  "version": "4.0.0"
 }
