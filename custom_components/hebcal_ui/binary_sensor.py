@@ -12,6 +12,7 @@ from homeassistant.helpers.event import async_track_point_in_time
  
 from .const import (
     DOMAIN,
+    VERSION,
     BINARY_SENSOR_TYPES,
     LANGUAGE_DATA,
     CONF_LANGUAGE,
@@ -139,7 +140,7 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
             "name": "Hebcal Jewish Calendar",
             "manufacturer": "Yuval Mejahez",
             "model": "Hebcal Jewish Calendar",
-            "sw_version": "4.0.0",
+            "sw_version": VERSION,
         }
 
     async def async_added_to_hass(self) -> None:
