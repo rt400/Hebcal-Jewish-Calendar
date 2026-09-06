@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "hebcal_ui"
-VERSION: Final = "4.0.1"
+VERSION: Final = "4.0.2"
 UPDATE_INTERVAL: Final = timedelta(minutes=30)  # עדכון כל 30 דקות
 FULL_UPDATE_INTERVAL: Final = timedelta(hours=6)  # עדכון מלא כל 6 שעות
 IMPORTANT_TIME_BUFFER: Final = timedelta(minutes=30)  # חיץ זמן לאירועים חשובים
