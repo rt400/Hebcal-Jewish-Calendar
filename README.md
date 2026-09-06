@@ -1,7 +1,7 @@
 # Hebcal Jewish Calendar for Home Assistant
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![GitHub release](https://img.shields.io/github/release/rt400/YOUR-NEW-REPO-NAME.svg)](https://github.com/rt400/Hebcal-Jewish-Calendar/releases)
+[![GitHub release](https://img.shields.io/github/release/rt400/Hebcal-Jewish-Calendar.svg)](https://github.com/rt400/Hebcal-Jewish-Calendar/releases)
 
 A modern, fully-featured Home Assistant integration for the Jewish calendar, Halachic times (Zmanim), Sabbaths, and Holidays. Powered by [Hebcal](https://www.hebcal.com/).
 
