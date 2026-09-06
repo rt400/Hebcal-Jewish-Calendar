@@ -1,0 +1,6 @@
+{
+  "name": "Hebcal Jewish Calendar",
+  "render_readme": true,
+  "filename": "hebcal",
+  "iot_class": "Cloud Polling"
+}
