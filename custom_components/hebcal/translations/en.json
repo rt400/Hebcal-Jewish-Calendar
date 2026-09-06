@@ -1,0 +1,114 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hebcal Jewish Calendar - Language Selection",
+        "description": "Choose your preferred language for event names and calendar information.",
+        "data": {
+          "language": "Language"
+        },
+        "data_description": {
+          "language": "Select the language for displaying Jewish calendar events and holiday names"
+        }
+      },
+      "location": {
+        "title": "Hebcal Jewish Calendar - Location Setup",
+        "description": "Configure your geographic location for accurate Jewish calendar calculations including Shabbat times, holidays, and halachic times (Zmanim).",
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude", 
+          "time_zone": "Time Zone"
+        },
+        "data_description": {
+          "latitude": "Your location's latitude coordinate (-90 to 90 degrees)",
+          "longitude": "Your location's longitude coordinate (-180 to 180 degrees)",
+          "time_zone": "Your local time zone (e.g., America/New_York, Europe/London, Asia/Jerusalem)"
+        }
+      },
+      "settings": {
+        "title": "Hebcal Jewish Calendar - Advanced Settings",
+        "description": "Configure additional settings for Jewish calendar calculations and display preferences.",
+        "data": {
+          "havdalah_minutes": "Havdalah Minutes",
+          "time_before_check": "Minutes Before Shabbat/Holiday Entrance",
+          "time_after_check": "Minutes After Shabbat/Holiday End", 
+          "jerusalem_candle": "Jerusalem Candle Lighting",
+          "tzeit_hakochavim": "Use Tzeit Hakochavim",
+          "diaspora": "Diaspora Mode",
+          "use_12h_time": "12-Hour Time Format",
+          "omer_count_type": "Omer Count Style"
+        },
+        "data_description": {
+          "havdalah_minutes": "Minutes after sunset for Havdalah. Common customs: 42 (Geonim), 50 (Jerusalem), 72 (Rabbeinu Tam).",
+          "time_before_check": "Buffer in minutes to activate sensors before Shabbat/Holiday entrance.",
+          "time_after_check": "Buffer in minutes to keep sensors active after Shabbat/Holiday end.",
+          "jerusalem_candle": "Enable to use the Jerusalem custom of lighting candles 40 minutes before sunset (instead of 18).",
+          "tzeit_hakochavim": "Use astronomical star emergence time for Havdalah timing, instead of a fixed number of minutes after sunset.",
+          "diaspora": "Enable this if you are outside of Israel (Diaspora). This will calculate holidays as two days long.",
+          "use_12h_time": "Display times in 12-hour format with AM/PM instead of 24-hour format.",
+          "omer_count_type": "Choose between Traditional Aramaic or Modern Hebrew text for Omer counting."
+        }
+      }
+    },
+    "error": {
+      "missing_location": "Location information is required for accurate calculations",
+      "invalid_latitude": "Latitude must be between -90 and 90 degrees",
+      "invalid_longitude": "Longitude must be between -180 and 180 degrees", 
+      "invalid_coordinates": "Please enter valid numeric coordinates",
+      "invalid_havdalah_minutes": "Havdalah minutes must be between 1 and 120",
+      "invalid_time_before": "Time before check must be between 0 and 60 minutes",
+      "invalid_time_after": "Time after check must be between 0 and 60 minutes",
+      "invalid_input": "Invalid input provided, please check your entries",
+      "cannot_connect": "Unable to connect to Hebcal API",
+      "unknown": "An unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "This location is already configured",
+      "single_instance_allowed": "Only one instance of Hebcal is allowed"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hebcal Jewish Calendar - Options",
+        "description": "Modify settings for your Hebcal Jewish Calendar integration.",
+        "data": {
+          "language": "Language",
+          "havdalah_minutes": "Havdalah Minutes",
+          "time_before_check": "Minutes Before Shabbat/Holiday Entrance",
+          "time_after_check": "Minutes After Shabbat/Holiday End",
+          "jerusalem_candle": "Jerusalem Candle Lighting", 
+          "tzeit_hakochavim": "Use Tzeit Hakochavim",
+          "diaspora": "Diaspora Mode",
+          "use_12h_time": "12-Hour Time Format",
+          "omer_count_type": "Omer Count Style"
+        },
+        "data_description": {
+          "language": "Language for displaying event names and calendar information.",
+          "havdalah_minutes": "Minutes after sunset for Havdalah. Common customs: 42 (Geonim), 50 (Jerusalem), 72 (Rabbeinu Tam).",
+          "time_before_check": "Buffer in minutes to activate sensors before Shabbat/Holiday entrance.",
+          "time_after_check": "Buffer in minutes to keep sensors active after Shabbat/Holiday end.",
+          "jerusalem_candle": "Enable to use the Jerusalem custom of lighting candles 40 minutes before sunset (instead of 18).",
+          "tzeit_hakochavim": "Use astronomical star emergence time for Havdalah timing, instead of a fixed number of minutes after sunset.",
+          "diaspora": "Enable this if you are outside of Israel (Diaspora). This will calculate holidays as two days long.",
+          "use_12h_time": "Display times in 12-hour format with AM/PM instead of 24-hour format.",
+          "omer_count_type": "Choose between Traditional Aramaic or Modern Hebrew text for Omer counting."
+        }
+      }
+    },
+    "error": {
+      "invalid_havdalah_minutes": "Havdalah minutes must be between 1 and 120",
+      "invalid_time_before": "Time before check must be between 0 and 60 minutes", 
+      "invalid_time_after": "Time after check must be between 0 and 60 minutes",
+      "invalid_input": "Invalid input provided, please check your entries"
+    }
+  },
+  "selector": {
+    "omer_count_type": {
+      "options": {
+        "omer_count_yemenite": "Yemenite Custom",
+        "omer_count_ashkenazi_sephardic": "Ashkenazi/Sephardic Custom"
+      }
+    }
+  }
+}
