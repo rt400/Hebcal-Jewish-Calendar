@@ -1,5 +1,5 @@
 {
-  "domain": "hebcal",
+  "domain": "hebcal_ui",
   "name": "Hebcal Jewish Calendar",
   "codeowners": ["@yuval_mejahez"],
   "config_flow": true,
