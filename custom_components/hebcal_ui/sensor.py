@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    VERSION,
     SENSOR_TYPES,
     LANGUAGE_DATA,
     ZMANIM_TRANSLATIONS,
@@ -98,7 +99,7 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             "name": "Hebcal Jewish Calendar",
             "manufacturer": "Yuval Mejahez",
             "model": "Hebcal Jewish Calendar",
-            "sw_version": "4.0.0",
+            "sw_version": VERSION,
         }
 
     async def async_added_to_hass(self) -> None:
