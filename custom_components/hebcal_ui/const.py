@@ -1,9 +1,20 @@
 """Constants for the Hebcal integration."""
+import json
+import os
 from datetime import timedelta
 from typing import Final
 
+# --- שאיבת הגרסה באופן דינמי מקובץ manifest.json ---
+try:
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    manifest_path = os.path.join(dir_path, "manifest.json")
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+        VERSION: Final = manifest_data.get("version", "unknown")
+except Exception:
+    VERSION: Final = "unknown"
+
 DOMAIN: Final = "hebcal_ui"
-VERSION: Final = "4.0.2"
 UPDATE_INTERVAL: Final = timedelta(minutes=30)  # עדכון כל 30 דקות
 FULL_UPDATE_INTERVAL: Final = timedelta(hours=6)  # עדכון מלא כל 6 שעות
 IMPORTANT_TIME_BUFFER: Final = timedelta(minutes=30)  # חיץ זמן לאירועים חשובים
@@ -42,8 +53,6 @@ HEBCAL_DATE_URL_HAVDALAH: Final = (
     "&s=on&c=on&o=on&geo=pos&lg={}&start={}&end={}&latitude={}&longitude={}"
     "&tzid={}&m={}&b={}&i={}"
 )
-
-"""Constants for the Hebcal integration."""
 
 # Entity ID mappings - always English for consistency
 ENTITY_ID_MAP = {
@@ -314,7 +323,7 @@ HEBREW_WEEKDAY: Final = {
     7: "יום ראשון, ",
 }
 
-# Omer counting texts (keeping your existing OMER_DAYS structure)
+# Omer counting texts
 OMER_DAYS: Final = [
     {
         1: "הַאידַּנָא חַד יוֹמָא בְּעֻמרָא",
