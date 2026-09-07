@@ -50,7 +50,6 @@ async def async_setup_entry(
 
 async def options_update_listener(hass: HomeAssistant, entry: ConfigEntry):
     """Handle options update."""
-    # Reload the integration to apply changes to all entities
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -68,24 +67,19 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         self.entry = entry
         self.sensor_type = sensor_type
         
-        # Important: Use constant English names for entity_id for stability
         sensor_config = SENSOR_TYPES[sensor_type]
-        english_entity_name = sensor_config["entity_id"]  # This is the English name from const.py
+        english_entity_name = sensor_config["entity_id"]
         
         self._attr_unique_id = f"{entry.entry_id}_{english_entity_name}"
-        # Force the English entity_id
         self.entity_id = f"sensor.hebcal_{english_entity_name}"
         
-        # Get configuration for display name
         self.language = entry.options.get(CONF_LANGUAGE, entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE))
         
-        # The display name can be in the user's chosen language
         self._attr_name = sensor_config["name"][self.language]
         self._attr_icon = sensor_config["icon"]
         self._attr_device_class = sensor_config["device_class"]
         self._attr_native_unit_of_measurement = sensor_config["unit"]
         
-        # Get configuration
         self.use_12h_time = entry.options.get(CONF_USE_12H_TIME, entry.data.get(CONF_USE_12H_TIME, DEFAULT_USE_12H_TIME))
         self.omer_count_type = entry.options.get(CONF_OMER_COUNT_TYPE, entry.data.get(CONF_OMER_COUNT_TYPE, DEFAULT_OMER_COUNT_TYPE))
         
@@ -115,7 +109,6 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        _LOGGER.debug("Coordinator update for %s", self.entity_id)
         self._schedule_future_update()
         self.async_write_ha_state()
 
@@ -188,80 +181,77 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         return {}
 
     def _get_shabbat_in(self) -> str:
-        """Get Shabbat entrance time."""
         shabbat_in = self.coordinator.data.get("shabbat_in")
-        if shabbat_in:
-            return self._format_time(shabbat_in)
+        if shabbat_in: return self._format_time(shabbat_in)
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_shabbat_out(self) -> str:
-        """Get Shabbat exit time."""
         shabbat_out = self.coordinator.data.get("shabbat_out")
-        if shabbat_out:
-            return self._format_time(shabbat_out)
+        if shabbat_out: return self._format_time(shabbat_out)
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_yomtov_in(self) -> str:
-        """Get Yom Tov entrance time."""
         yomtov_in = self.coordinator.data.get("yomtov_in")
         if yomtov_in:
             today = datetime.datetime.now().date()
-            if yomtov_in.date() >= today:
+            dt = yomtov_in if isinstance(yomtov_in, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_in).replace('Z','+00:00'))
+            if dt.date() >= today:
                 return self._format_time(yomtov_in)
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_yomtov_out(self) -> str:
-        """Get Yom Tov exit time."""
         yomtov_out = self.coordinator.data.get("yomtov_out")
         if yomtov_out:
             today = datetime.datetime.now().date()
-            if yomtov_out.date() >= today:
+            dt = yomtov_out if isinstance(yomtov_out, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_out).replace('Z','+00:00'))
+            if dt.date() >= today:
                 return self._format_time(yomtov_out)
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_parasha(self) -> str:
-        """Get Torah portion."""
         parasha = self.coordinator.data.get("parasha")
-        if parasha:
-            return parasha
+        if parasha: return parasha
         return LANGUAGE_DATA[self.language]["special_shabbat"]
 
     def _get_yomtov_name(self) -> str:
-        """Get Yom Tov name."""
+        holidays = self.coordinator.data.get("holidays", [])
+        if holidays and len(holidays) > 0:
+            return holidays[0].get("name", LANGUAGE_DATA[self.language]["no_info"])
+            
         yomtov_name = self.coordinator.data.get("yomtov_name")
-        if yomtov_name:
-            return yomtov_name
+        if yomtov_name: return yomtov_name
+            
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_event_name(self) -> str:
-        """Get current event name."""
         today = datetime.datetime.now()
-        
-        # Check for current holidays
         events = self.coordinator.data.get("events", [])
         for event in events:
             if "start" in event and "end" in event:
-                start = datetime.datetime.fromisoformat(event["start"][:19])
-                end = datetime.datetime.fromisoformat(event["end"][:19])
-                if start <= today <= end:
-                    return event.get("title", "")
+                try:
+                    start = datetime.datetime.fromisoformat(event["start"][:19])
+                    end = datetime.datetime.fromisoformat(event["end"][:19])
+                    if start <= today <= end:
+                        return event.get("title", "")
+                except (ValueError, TypeError): continue
         
-        # Return current weekday
         if self.language == "hebrew":
             return HEBREW_WEEKDAY.get(today.isoweekday(), "")
         else:
             return today.strftime("%A")
 
     def _get_omer_day(self) -> str:
-        """Get Omer count."""
         if not self.coordinator.data:
             return LANGUAGE_DATA[self.language]["no_omer"]
 
         now = datetime.datetime.now()
         sunset = self.coordinator.data.get("zmanim", {}).get("shkia")
+        if isinstance(sunset, str):
+            try: sunset = datetime.datetime.fromisoformat(sunset)
+            except: pass
 
         target_date = now.date()
-        if sunset and now > sunset:
+        if sunset and isinstance(sunset, datetime.datetime) and now > sunset:
             target_date += datetime.timedelta(days=1)
 
         day_num = None
@@ -284,40 +274,35 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         return LANGUAGE_DATA[self.language]["no_omer"]
 
     def _get_hebrew_date(self) -> str:
-        """Get Hebrew date based on sunset, as the Jewish day starts in the evening."""
         now = datetime.datetime.now()
         zmanim = self.coordinator.data.get("zmanim", {})
         sunset = zmanim.get("shkia")
+        if isinstance(sunset, str):
+            try: sunset = datetime.datetime.fromisoformat(sunset)
+            except: pass
 
         hebrew_date_data = self.coordinator.data.get("hebrew_date", {})
         date_to_show = None
         gregorian_date_for_weekday = datetime.date.today()
 
-        # Determine which day's date to show
-        if sunset and now > sunset:
-            # After sunset, it's the next Hebrew day
+        if sunset and isinstance(sunset, datetime.datetime) and now > sunset:
             date_to_show = hebrew_date_data.get("tomorrow", {})
             gregorian_date_for_weekday += datetime.timedelta(days=1)
         else:
-            # Before sunset, it's the current Hebrew day
             date_to_show = hebrew_date_data.get("today", {})
 
         if not date_to_show:
             return LANGUAGE_DATA[self.language]["no_info"]
 
         if self.language == "hebrew":
-            # The Hebrew string from hdate already includes the day of the week
             return date_to_show.get("hebrew", "")
         else:
-            # The English string from hdate does not, so we add it.
             weekday = gregorian_date_for_weekday.strftime("%A")
             english_date = date_to_show.get("english", "")
-            if not english_date:
-                return LANGUAGE_DATA[self.language]["no_info"]
+            if not english_date: return LANGUAGE_DATA[self.language]["no_info"]
             return f"{weekday}, {english_date}"
 
     def _get_zmanim(self) -> str:
-        """Get Zmanim description."""
         today = datetime.date.today()
         if self.language == "hebrew":
             return f"זמנים הלכתיים עבור יום {today}"
@@ -328,29 +313,42 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         """Get Zmanim as attributes."""
         zmanim_data = self.coordinator.data.get("zmanim", {})
         
+        if not isinstance(zmanim_data, dict):
+            return {"error": "Zmanim data is not a valid dictionary"}
+            
         attributes = {}
-        for key, time_dt in zmanim_data.items():
-            # נבדוק שיש תרגום לשם ושיש שעה
-            if key in ZMANIM_TRANSLATIONS and time_dt:
-                formatted_time = self._format_time(time_dt)
-                translated_key = ZMANIM_TRANSLATIONS[key][self.language]
-                attributes[translated_key] = formatted_time
+        try:
+            for key, time_dt in zmanim_data.items():
+                if time_dt:
+                    formatted_time = self._format_time(time_dt)
+                    
+                    if key in ZMANIM_TRANSLATIONS:
+                        translated_key = ZMANIM_TRANSLATIONS[key].get(self.language, key)
+                        attributes[translated_key] = formatted_time
+                    else:
+                        attributes[key] = formatted_time
+                        
+            if not attributes:
+                attributes["status"] = "No Zmanim available for today"
+                
+        except Exception as e:
+            _LOGGER.error("Error generating zmanim attributes: %s", e)
+            attributes["error_details"] = str(e)
 
         return attributes
 
-    def _format_time(self, dt: datetime.datetime) -> str:
-        """Format datetime to time string."""
-        if self.use_12h_time:
-            return dt.strftime("%I:%M %p")
-        else:
-            return dt.strftime("%H:%M")
-
-    def _format_time_string(self, time_str: str) -> str:
-        """Format time string according to 12h/24h preference."""
-        if self.use_12h_time:
+    def _format_time(self, dt: Any) -> str:
+        """Format datetime to time string safely."""
+        if isinstance(dt, str):
             try:
-                dt = datetime.datetime.strptime(time_str, "%H:%M")
+                if dt.endswith('Z'): dt = datetime.datetime.fromisoformat(dt[:-1] + '+00:00')
+                else: dt = datetime.datetime.fromisoformat(dt)
+            except (ValueError, TypeError):
+                return dt
+                
+        if isinstance(dt, datetime.datetime):
+            if self.use_12h_time:
                 return dt.strftime("%I:%M %p")
-            except ValueError:
-                return time_str
-        return time_str
+            else:
+                return dt.strftime("%H:%M")
+        return str(dt)
