@@ -214,12 +214,44 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         return LANGUAGE_DATA[self.language]["special_shabbat"]
 
     def _get_yomtov_name(self) -> str:
+        """Get Yom Tov name."""
         holidays = self.coordinator.data.get("holidays", [])
-        if holidays and len(holidays) > 0:
-            return holidays[0].get("name", LANGUAGE_DATA[self.language]["no_info"])
+        now = datetime.datetime.now()
+        
+        if holidays:
+            for holiday in holidays:
+                # חיפוש זמן סיום החג (צאת החג או השקיעה)
+                end_time = holiday.get("yomtov_out") or holiday.get("end")
+                
+                # המרה בטוחה של זמן הסיום ל-datetime במידה והוא טקסט
+                if isinstance(end_time, str):
+                    try:
+                        if end_time.endswith('Z'):
+                            dt = datetime.datetime.fromisoformat(end_time[:-1] + '+00:00')
+                        else:
+                            dt = datetime.datetime.fromisoformat(end_time)
+                        end_time = dt.replace(tzinfo=None)
+                    except (ValueError, TypeError):
+                        pass
+                
+                # מחזירים את החג הראשון שעוד לא נגמר (זמן הסיום שלו מאוחר מעכשיו)
+                if isinstance(end_time, datetime.datetime) and end_time >= now:
+                    return holiday.get("name", LANGUAGE_DATA[self.language]["no_info"])
+                
+                # גיבוי: אם לא הצלחנו למצוא שעת סיום מדויקת, נבדוק לפי התאריך הכללי
+                elif not isinstance(end_time, datetime.datetime):
+                    holiday_date_str = holiday.get("date", "")
+                    if isinstance(holiday_date_str, str) and len(holiday_date_str) >= 10:
+                        if holiday_date_str[:10] >= now.date().isoformat():
+                            return holiday.get("name", LANGUAGE_DATA[self.language]["no_info"])
             
+            # אם כל החגים ברשימה כבר עברו, החזר ערך ריק/אין מידע
+            return LANGUAGE_DATA[self.language]["no_info"]
+
+        # תמיכה לאחור במידה ו-yomtov_name מוגדר ישירות (ללא רשימה)
         yomtov_name = self.coordinator.data.get("yomtov_name")
-        if yomtov_name: return yomtov_name
+        if yomtov_name: 
+            return yomtov_name
             
         return LANGUAGE_DATA[self.language]["no_info"]
 
