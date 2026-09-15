@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.event import async_track_time_change
 from .const import (
     DOMAIN,
+    VERSION,
     UPDATE_INTERVAL,
     CONF_HAVDALAH_MINUTES,
     CONF_TIME_BEFORE_CHECK,
@@ -317,14 +318,16 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         """
         # No data at all
         if not self.data or not self.last_full_update:
-            _LOGGER.debug("Full update needed: No existing data")
             return True
-
-        # New day has passed
+            
         if self.last_date_checked != today:
-            _LOGGER.debug("Full update needed: New day detected")
             return True
-
+            
+        from .const import FULL_UPDATE_INTERVAL
+        if now - self.last_full_update > FULL_UPDATE_INTERVAL:
+            _LOGGER.debug("Full update needed: 6 hours have passed")
+            return True
+            
         return False
 
     async def _full_api_update(self, today: datetime.date) -> dict[str, any]:
@@ -469,8 +472,9 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
                 self.havdalah_minutes, self.candle_minutes, diaspora
             )
 
+        headers = {"User-Agent": f"HomeAssistant-Hebcal/{VERSION}"}
         _LOGGER.debug("Fetching from URL: %s", url)
-        async with session.get(url) as response:
+        async with session.get(url, headers=headers) as response:
             response.raise_for_status()
             return await response.json()
 
@@ -498,8 +502,12 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         """
         try:
             hdate_obj = hdate.HDateInfo(date)
+            
+            # מכריחים את הספרייה לעבור לעברית כדי למנוע הישארות של האנגלית מהריצה הקודמת
             set_language("he")
             hebrew_date_str = str(hdate_obj).replace("ה' ", "ה")
+            
+            # מעבירים לאנגלית עבור המפתח השני
             set_language("en")
             english_date_str = str(hdate_obj)
             
