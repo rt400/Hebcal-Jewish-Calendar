@@ -178,6 +178,7 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         """Return additional state attributes."""
         if not self.coordinator.data:
             return {}
+
         if self.sensor_type == "zmanim":
             return self._get_zmanim_attributes()
             
@@ -185,7 +186,7 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         
         if self.sensor_type in ["shabbat_in", "shabbat_out", "yomtov_in", "yomtov_out"]:
             dt_val = self.coordinator.data.get(self.sensor_type)
-    
+            
             if isinstance(dt_val, str):
                 try:
                     if dt_val.endswith('Z'):
@@ -241,6 +242,16 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         return LANGUAGE_DATA[self.language]["special_shabbat"]
 
     def _get_yomtov_name(self) -> str:
+        holidays = self.coordinator.data.get("holidays", [])
+        if holidays and len(holidays) > 0:
+            return holidays[0].get("name", LANGUAGE_DATA[self.language]["no_info"])
+            
+        yomtov_name = self.coordinator.data.get("yomtov_name")
+        if yomtov_name: return yomtov_name
+            
+        return LANGUAGE_DATA[self.language]["no_info"]
+
+    def _get_yomtov_name(self) -> str:
         """Get Yom Tov name."""
         holidays = self.coordinator.data.get("holidays", [])
         now = datetime.datetime.now()
@@ -281,23 +292,6 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             return yomtov_name
             
         return LANGUAGE_DATA[self.language]["no_info"]
-
-    def _get_event_name(self) -> str:
-        today = datetime.datetime.now()
-        events = self.coordinator.data.get("events", [])
-        for event in events:
-            if "start" in event and "end" in event:
-                try:
-                    start = datetime.datetime.fromisoformat(event["start"][:19])
-                    end = datetime.datetime.fromisoformat(event["end"][:19])
-                    if start <= today <= end:
-                        return event.get("title", "")
-                except (ValueError, TypeError): continue
-        
-        if self.language == "hebrew":
-            return HEBREW_WEEKDAY.get(today.isoweekday(), "")
-        else:
-            return today.strftime("%A")
 
     def _get_omer_day(self) -> str:
         if not self.coordinator.data:
