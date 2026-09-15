@@ -495,23 +495,17 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
     def _fetch_hebrew_date(self, date: datetime.date) -> dict[str, str]:
         """
         Fetch Hebrew date conversion from the local hdate library.
-
-        Args:
-            date: Gregorian date to convert
-
-        Returns:
-            A dictionary containing the Hebrew date.
         """
         try:
-            # Create a single HDateInfo object to get both Hebrew and English dates.
-            # Create an HDate object from the Gregorian date.
             hdate_obj = hdate.HDateInfo(date)
+            set_language("he")
             hebrew_date_str = str(hdate_obj).replace("ה' ", "ה")
             set_language("en")
             english_date_str = str(hdate_obj)
+            
             return {"hebrew": hebrew_date_str, "english": english_date_str}
         except Exception as e:
-            _LOGGER.warning("Could not fetch Hebrew date using hdate.HDateInfo: %s. This might be due to a library version issue.", e)
+            _LOGGER.warning("Could not fetch Hebrew date using hdate.HDateInfo: %s", e)
             return {"hebrew": "", "english": ""}
 
     async def _process_data(
