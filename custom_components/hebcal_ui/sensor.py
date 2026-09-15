@@ -176,9 +176,36 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
+        if not self.coordinator.data:
+            return {}
         if self.sensor_type == "zmanim":
             return self._get_zmanim_attributes()
-        return {}
+            
+        attributes = {}
+        
+        if self.sensor_type in ["shabbat_in", "shabbat_out", "yomtov_in", "yomtov_out"]:
+            dt_val = self.coordinator.data.get(self.sensor_type)
+    
+            if isinstance(dt_val, str):
+                try:
+                    if dt_val.endswith('Z'):
+                        dt_val = datetime.datetime.fromisoformat(dt_val[:-1] + '+00:00')
+                    else:
+                        dt_val = datetime.datetime.fromisoformat(dt_val)
+                except (ValueError, TypeError):
+                    pass
+                    
+            if isinstance(dt_val, datetime.datetime):
+                if self.language == "hebrew":
+                    attributes["תאריך_מלא"] = dt_val.strftime("%d/%m/%Y %H:%M")
+                    attributes["תאריך"] = dt_val.strftime("%d/%m/%Y")
+                    attributes["שעה"] = self._format_time(dt_val)
+                else:
+                    attributes["full_date"] = dt_val.strftime("%Y-%m-%d %H:%M")
+                    attributes["date"] = dt_val.strftime("%Y-%m-%d")
+                    attributes["time"] = self._format_time(dt_val)
+                    
+        return attributes
 
     def _get_shabbat_in(self) -> str:
         shabbat_in = self.coordinator.data.get("shabbat_in")
