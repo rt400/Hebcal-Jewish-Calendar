@@ -79,6 +79,22 @@ def _add_manual_event(processed: dict, event_type: str, event_time: datetime.dat
     })
     _LOGGER.debug("Added manual %s event at %s", event_type, event_time)
 
+def _yomtov_slot_is_free(processed: dict[str, any]) -> bool:
+    """True when the Yom Tov slot holds nothing that still matters.
+
+    A single Sunday..Saturday window can contain two distinct Yom Tov onsets, so the
+    slot can be neither overwritten unconditionally (which loses the first) nor never
+    overwritten (which loses the second).
+
+    A yomtov_in with no yomtov_out is an open period whose end has not been derived
+    yet -- this runs before the pairing block below -- so it must never be treated as
+    free, or a Yom Tov in progress is discarded.
+    """
+    yomtov_out = processed.get("yomtov_out")
+    if yomtov_out is not None:
+        return yomtov_out < datetime.datetime.now()
+    return processed.get("yomtov_in") is None
+
 async def _complete_missing_times(coordinator, processed: dict[str, any]):
     """
     Complete missing candle lighting and Havdalah times using calculations.
@@ -110,7 +126,7 @@ async def _complete_missing_times(coordinator, processed: dict[str, any]):
             # Handle special holiday that starts after Shabbat
             # This logic is for a holiday that BEGINS on Saturday night.
             # We must check that yomtov_in was not already set for a holiday that began on Friday.
-            if processed.get("special_holiday") and not processed.get("yomtov_in"):
+            if processed.get("special_holiday") and _yomtov_slot_is_free(processed):
                 # This condition is now met only when a holiday truly starts after Shabbat.
                 yomtov_in_calculated = coordinator.get_offline_missing_time(
                     processed["shabbat_in"],
@@ -119,6 +135,9 @@ async def _complete_missing_times(coordinator, processed: dict[str, any]):
                 )
                 if yomtov_in_calculated:
                     processed["yomtov_in"] = yomtov_in_calculated
+                    # the previous pair, if any, is spent; let the block below
+                    # derive a matching end for the onset just claimed
+                    processed["yomtov_out"] = None
                     _add_manual_event(processed, "candles", yomtov_in_calculated)
 
     elif not processed.get("shabbat_in") and processed.get("shabbat_out"):
