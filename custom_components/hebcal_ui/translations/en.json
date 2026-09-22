@@ -34,7 +34,7 @@
           "time_after_check": "Minutes After Shabbat/Holiday End", 
           "jerusalem_candle": "Jerusalem Candle Lighting",
           "tzeit_hakochavim": "Use Tzeit Hakochavim",
-          "diaspora": "Diaspora Mode",
+          "diaspora": "Israel Mode (one-day holidays)",
           "use_12h_time": "12-Hour Time Format",
           "omer_count_type": "Omer Count Style"
         },
@@ -44,7 +44,7 @@
           "time_after_check": "Buffer in minutes to keep sensors active after Shabbat/Holiday end.",
           "jerusalem_candle": "Enable to use the Jerusalem custom of lighting candles 40 minutes before sunset (instead of 18).",
           "tzeit_hakochavim": "Use astronomical star emergence time for Havdalah timing, instead of a fixed number of minutes after sunset.",
-          "diaspora": "Enable this if you are outside of Israel (Diaspora). This will calculate holidays as two days long.",
+          "diaspora": "Enable this only if you are in Israel, where holidays are one day long. Leave it off if you are outside Israel (Diaspora) to get the two-day schedule. This is the default.",
           "use_12h_time": "Display times in 12-hour format with AM/PM instead of 24-hour format.",
           "omer_count_type": "Choose between Traditional Aramaic or Modern Hebrew text for Omer counting."
         }
@@ -79,7 +79,7 @@
           "time_after_check": "Minutes After Shabbat/Holiday End",
           "jerusalem_candle": "Jerusalem Candle Lighting", 
           "tzeit_hakochavim": "Use Tzeit Hakochavim",
-          "diaspora": "Diaspora Mode",
+          "diaspora": "Israel Mode (one-day holidays)",
           "use_12h_time": "12-Hour Time Format",
           "omer_count_type": "Omer Count Style"
         },
@@ -90,7 +90,7 @@
           "time_after_check": "Buffer in minutes to keep sensors active after Shabbat/Holiday end.",
           "jerusalem_candle": "Enable to use the Jerusalem custom of lighting candles 40 minutes before sunset (instead of 18).",
           "tzeit_hakochavim": "Use astronomical star emergence time for Havdalah timing, instead of a fixed number of minutes after sunset.",
-          "diaspora": "Enable this if you are outside of Israel (Diaspora). This will calculate holidays as two days long.",
+          "diaspora": "Enable this only if you are in Israel, where holidays are one day long. Leave it off if you are outside Israel (Diaspora) to get the two-day schedule. This is the default.",
           "use_12h_time": "Display times in 12-hour format with AM/PM instead of 24-hour format.",
           "omer_count_type": "Choose between Traditional Aramaic or Modern Hebrew text for Omer counting."
         }
