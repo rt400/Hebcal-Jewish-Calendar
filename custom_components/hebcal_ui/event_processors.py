@@ -29,8 +29,12 @@ async def process_hebcal_item(coordinator, item: dict[str, any], processed: dict
     if "special_holiday" not in processed:
         processed["special_holiday"] = False
 
-    title_orig = item.get("title_orig", "")
-    if "Rosh Hashana" in title_orig:
+    # Hebcal only returns title_orig for non-English lg values; with lg=s the
+    # English name is in title itself, so check both or Rosh Hashana is never
+    # detected for English installations and is treated as a one-day festival.
+    title_orig = item.get("title_orig") or ""
+    title = item.get("title") or ""
+    if "Rosh Hashana" in title_orig or "Rosh Hashana" in title:
         processed["rosh_hashana"] = True
         _LOGGER.debug("Identified Rosh Hashana event: %s", title_orig)
 
