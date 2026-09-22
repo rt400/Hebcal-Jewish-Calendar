@@ -110,7 +110,10 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
 
         # Calculated settings
         self.candle_minutes = 40 if self.jerusalem_candle else 18
-        self.offline_hebcal = hdate.Location(latitude=self.latitude, longitude=self.longitude, timezone=self.timezone)
+        self.offline_hebcal = hdate.Location(latitude=self.latitude, longitude=self.longitude, timezone=self.timezone,
+                                             # diaspora_mode selects Hebcal i=on, i.e. the
+                                             # Israel schedule, so hdate takes its negation
+                                             diaspora=not self.diaspora_mode)
 
     async def async_setup(self) -> None:
         """
