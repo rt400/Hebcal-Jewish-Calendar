@@ -1,0 +1,103 @@
+[
+ {
+  "category": "holiday",
+  "date": "2026-09-20",
+  "hdate": "9 Tishrei 5787",
+  "hebrew": "ערב יום כיפור",
+  "link": "https://hebcal.com/h/yom-kippur-2026?us=js&um=api",
+  "memo": "ערב יום הכיפורים, הכולל את תפילת כל נדרי. צום יום הכיפורים מתחיל עם שקיעת החמה ונמשך 25 שעות",
+  "subcat": "major",
+  "title": "עֶרֶב יוֹם כִּפּוּר",
+  "title_orig": "Erev Yom Kippur"
+ },
+ {
+  "category": "candles",
+  "date": "2026-09-20T18:38:00-04:00",
+  "hebrew": "הדלקת נרות",
+  "memo": "עֶרֶב יוֹם כִּפּוּר",
+  "title": "הַדְלָקַת נֵרוֹת: 6:38pm",
+  "title_orig": "Candle lighting"
+ },
+ {
+  "category": "holiday",
+  "date": "2026-09-21",
+  "hdate": "10 Tishrei 5787",
+  "hebrew": "יום כיפור",
+  "leyning": {
+   "1": "Leviticus 16:1-16:6",
+   "2": "Leviticus 16:7-16:11",
+   "3": "Leviticus 16:12-16:17",
+   "4": "Leviticus 16:18-16:24",
+   "5": "Leviticus 16:25-16:30",
+   "6": "Leviticus 16:31-16:34",
+   "haftarah": "Isaiah 57:14-58:14",
+   "maftir": "Numbers 29:7-29:11",
+   "torah": "Leviticus 16:1-34; Numbers 29:7-11"
+  },
+  "link": "https://hebcal.com/h/yom-kippur-2026?us=js&um=api",
+  "memo": "יום הכיפורים. היום הקדוש ביותר בשנה ביהדות, המצוין באופן מסורתי בצום של 25 שעות ותפילה אינטנסיבית",
+  "subcat": "major",
+  "title": "יוֹם כִּפּוּר",
+  "title_orig": "Yom Kippur",
+  "yomtov": true
+ },
+ {
+  "category": "havdalah",
+  "date": "2026-09-21T19:35:00-04:00",
+  "hebrew": "הבדלה",
+  "memo": "יוֹם כִּפּוּר",
+  "title": "הַבְדָּלָה: 7:35pm",
+  "title_orig": "Havdalah"
+ },
+ {
+  "category": "holiday",
+  "date": "2026-09-25",
+  "hdate": "14 Tishrei 5787",
+  "hebrew": "ערב סוכות",
+  "link": "https://hebcal.com/h/sukkot-2026?us=js&um=api",
+  "memo": "חג הסוכות. החג שנמשך שבעה ימים הוא אחד משלושת הרגלים",
+  "subcat": "major",
+  "title": "עֶרֶב סֻכּוֹת",
+  "title_orig": "Erev Sukkot"
+ },
+ {
+  "category": "candles",
+  "date": "2026-09-25T18:30:00-04:00",
+  "hebrew": "הדלקת נרות",
+  "memo": "עֶרֶב סֻכּוֹת",
+  "title": "הַדְלָקַת נֵרוֹת: 6:30pm",
+  "title_orig": "Candle lighting"
+ },
+ {
+  "category": "holiday",
+  "date": "2026-09-26",
+  "hdate": "15 Tishrei 5787",
+  "hebrew": "סוכות א׳",
+  "leyning": {
+   "1": "Leviticus 22:26-22:33",
+   "2": "Leviticus 23:1-23:3",
+   "3": "Leviticus 23:4-23:8",
+   "4": "Leviticus 23:9-23:14",
+   "5": "Leviticus 23:15-23:22",
+   "6": "Leviticus 23:23-23:32",
+   "7": "Leviticus 23:33-23:44",
+   "haftarah": "Zechariah 14:1-21",
+   "maftir": "Numbers 29:12-29:16",
+   "torah": "Leviticus 22:26-23:44; Numbers 29:12-16"
+  },
+  "link": "https://hebcal.com/h/sukkot-2026?us=js&um=api",
+  "memo": "חג הסוכות. החג שנמשך שבעה ימים הוא אחד משלושת הרגלים",
+  "subcat": "major",
+  "title": "סֻכּוֹת א׳",
+  "title_orig": "Sukkot I",
+  "yomtov": true
+ },
+ {
+  "category": "candles",
+  "date": "2026-09-26T19:27:00-04:00",
+  "hebrew": "הדלקת נרות",
+  "memo": "סֻכּוֹת א׳",
+  "title": "הַדְלָקַת נֵרוֹת: 7:27pm",
+  "title_orig": "Candle lighting"
+ }
+]

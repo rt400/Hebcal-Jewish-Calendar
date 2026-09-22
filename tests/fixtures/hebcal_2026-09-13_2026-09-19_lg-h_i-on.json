@@ -1,0 +1,128 @@
+[
+ {
+  "category": "holiday",
+  "date": "2026-09-13",
+  "hdate": "2 Tishrei 5787",
+  "hebrew": "ראש השנה ב׳",
+  "leyning": {
+   "1": "Genesis 22:1-22:3",
+   "2": "Genesis 22:4-22:8",
+   "3": "Genesis 22:9-22:14",
+   "4": "Genesis 22:15-22:19",
+   "5": "Genesis 22:20-22:24",
+   "haftarah": "Jeremiah 31:2-20",
+   "maftir": "Numbers 29:1-29:6",
+   "torah": "Genesis 22:1-24; Numbers 29:1-6"
+  },
+  "link": "https://hebcal.com/h/rosh-hashana-2026?i=on&us=js&um=api",
+  "memo": "ראש השנה היהודי",
+  "subcat": "major",
+  "title": "רֹאשׁ הַשָּׁנָה ב׳",
+  "title_orig": "Rosh Hashana II",
+  "yomtov": true
+ },
+ {
+  "category": "havdalah",
+  "date": "2026-09-13T19:49:00-04:00",
+  "hebrew": "הבדלה",
+  "memo": "רֹאשׁ הַשָּׁנָה ב׳",
+  "title": "הַבְדָּלָה: 19:49",
+  "title_orig": "Havdalah"
+ },
+ {
+  "category": "zmanim",
+  "date": "2026-09-14T05:13:00-04:00",
+  "hebrew": "תחילת הצום",
+  "memo": "צוֹם גְּדַלְיָה",
+  "subcat": "fast",
+  "title": "תְּחִילַּת הַצוֹם",
+  "title_orig": "Fast begins"
+ },
+ {
+  "category": "holiday",
+  "date": "2026-09-14",
+  "hdate": "3 Tishrei 5787",
+  "hebrew": "צום גדליה",
+  "leyning": {
+   "1": "Exodus 32:11-32:14",
+   "2": "Exodus 34:1-34:3",
+   "3": "Exodus 34:4-34:10",
+   "torah": "Exodus 32:11-14, 34:1-10"
+  },
+  "link": "https://hebcal.com/h/tzom-gedaliah-2026?i=on&us=js&um=api",
+  "memo": "צום גדליה (צום החודש השביעי). מציין את רצח המושל היהודי של יהודה",
+  "subcat": "fast",
+  "title": "צוֹם גְּדַלְיָה",
+  "title_orig": "Tzom Gedaliah"
+ },
+ {
+  "category": "zmanim",
+  "date": "2026-09-14T19:22:00-04:00",
+  "hebrew": "סיום הצום",
+  "memo": "צוֹם גְּדַלְיָה",
+  "subcat": "fast",
+  "title": "סִיּוּם הַצוֹם",
+  "title_orig": "Fast ends"
+ },
+ {
+  "category": "candles",
+  "date": "2026-09-18T18:39:00-04:00",
+  "hebrew": "הדלקת נרות",
+  "memo": "פָּרָשַׁת הַאֲזִינוּ",
+  "title": "הַדְלָקַת נֵרוֹת: 18:39",
+  "title_orig": "Candle lighting"
+ },
+ {
+  "category": "holiday",
+  "date": "2026-09-19",
+  "hdate": "8 Tishrei 5787",
+  "hebrew": "שבת שובה",
+  "leyning": {
+   "haftarah": "Hosea 14:2-10; Micah 7:18-20; Joel 2:15-27"
+  },
+  "link": "https://hebcal.com/h/shabbat-shuva-2026?i=on&us=js&um=api",
+  "memo": "שבת שובה. השבת שחלה במהלך עשרת ימי תשובה בין ראש השנה ליום כיפור",
+  "subcat": "shabbat",
+  "title": "שַׁבַּת שׁוּבָה",
+  "title_orig": "Shabbat Shuva"
+ },
+ {
+  "category": "parashat",
+  "date": "2026-09-19",
+  "hdate": "8 Tishrei 5787",
+  "hebrew": "פרשת האזינו",
+  "leyning": {
+   "1": "Deuteronomy 32:1-32:6",
+   "2": "Deuteronomy 32:7-32:12",
+   "3": "Deuteronomy 32:13-32:18",
+   "4": "Deuteronomy 32:19-32:28",
+   "5": "Deuteronomy 32:29-32:39",
+   "6": "Deuteronomy 32:40-32:43",
+   "7": "Deuteronomy 32:44-32:52",
+   "haftarah": "Hosea 14:2-10; Joel 2:15-27 | Shabbat Shuva (with Ha'azinu)",
+   "haftarah_sephardic": "Hosea 14:2-10; Micah 7:18-20 | Shabbat Shuva (with Ha'azinu)",
+   "maftir": "Deuteronomy 32:48-32:52",
+   "torah": "Deuteronomy 32:1-52",
+   "triennial": {
+    "1": "Deuteronomy 32:1-32:6",
+    "2": "Deuteronomy 32:7-32:12",
+    "3": "Deuteronomy 32:13-32:18",
+    "4": "Deuteronomy 32:19-32:28",
+    "5": "Deuteronomy 32:29-32:39",
+    "6": "Deuteronomy 32:40-32:43",
+    "7": "Deuteronomy 32:44-32:52",
+    "maftir": "Deuteronomy 32:48-32:52"
+   }
+  },
+  "link": "https://hebcal.com/s/5787i/53?us=js&um=api",
+  "title": "פָּרָשַׁת הַאֲזִינוּ",
+  "title_orig": "Parashat Ha'azinu"
+ },
+ {
+  "category": "havdalah",
+  "date": "2026-09-19T19:39:00-04:00",
+  "hebrew": "הבדלה",
+  "title": "הַבְדָּלָה: 19:39",
+  "title_orig": "Havdalah"
+ }
+]
