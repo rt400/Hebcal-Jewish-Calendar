@@ -220,36 +220,80 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
 
     def _get_yomtov_in(self) -> str:
         yomtov_in = self.coordinator.data.get("yomtov_in")
+        yomtov_out = self.coordinator.data.get("yomtov_out")
+        
         if yomtov_in:
-            today = datetime.datetime.now().date()
-            dt = yomtov_in if isinstance(yomtov_in, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_in).replace('Z','+00:00'))
-            if dt.date() >= today:
-                return self._format_time(yomtov_in)
+            now = datetime.datetime.now()
+            
+            if yomtov_out:
+                dt_out = yomtov_out if isinstance(yomtov_out, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_out).replace('Z','+00:00')).replace(tzinfo=None)
+                
+                # בדיקה רק לפי התאריך (מתעלמים מהשעה), כדי שהמידע יישאר עד חצות
+                if dt_out.date() >= now.date():
+                    return self._format_time(yomtov_in)
+            else:
+                dt_in = yomtov_in if isinstance(yomtov_in, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_in).replace('Z','+00:00')).replace(tzinfo=None)
+                if dt_in.date() >= now.date():
+                    return self._format_time(yomtov_in)
+                    
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_yomtov_out(self) -> str:
         yomtov_out = self.coordinator.data.get("yomtov_out")
+        
         if yomtov_out:
-            today = datetime.datetime.now().date()
-            dt = yomtov_out if isinstance(yomtov_out, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_out).replace('Z','+00:00'))
-            if dt.date() >= today:
+            now = datetime.datetime.now()
+            dt_out = yomtov_out if isinstance(yomtov_out, datetime.datetime) else datetime.datetime.fromisoformat(str(yomtov_out).replace('Z','+00:00')).replace(tzinfo=None)
+            
+            # בדיקה רק לפי התאריך (מתעלמים מהשעה)
+            if dt_out.date() >= now.date():
                 return self._format_time(yomtov_out)
+                
         return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_parasha(self) -> str:
+        """Get Torah portion."""
         parasha = self.coordinator.data.get("parasha")
-        if parasha: return parasha
+        
+        # אם יש פרשה רגילה, נחזיר אותה
+        if parasha:
+            return parasha
+            
+        # אם אין פרשה (למשל כי זה שבת-חג), נחפש חג שנופל בדיוק על שבת
+        shabbat_out = self.coordinator.data.get("shabbat_out")
+        shabbat_date = None
+        
+        # חילוץ בטוח של התאריך של יום השבת
+        if isinstance(shabbat_out, str):
+            try:
+                if shabbat_out.endswith('Z'):
+                    shabbat_date = datetime.datetime.fromisoformat(shabbat_out[:-1] + '+00:00').date()
+                else:
+                    shabbat_date = datetime.datetime.fromisoformat(shabbat_out).date()
+            except (ValueError, TypeError):
+                pass
+        elif isinstance(shabbat_out, datetime.datetime):
+            shabbat_date = shabbat_out.date()
+            
+        # אם מצאנו את תאריך השבת, נעבור על כל החגים של השבוע
+        if shabbat_date:
+            holidays = self.coordinator.data.get("holidays", [])
+            for holiday in holidays:
+                holiday_date_str = holiday.get("date", "")
+                
+                # בודקים אם התאריך של החג זהה בדיוק לתאריך של השבת (10 התווים הראשונים = YYYY-MM-DD)
+                if isinstance(holiday_date_str, str) and len(holiday_date_str) >= 10:
+                    if holiday_date_str[:10] == shabbat_date.isoformat():
+                        holiday_name = holiday.get("name", "")
+                        
+                        # מחזירים את התצוגה המבוקשת לפי השפה
+                        if self.language == "hebrew":
+                            return f"שבת ({holiday_name})"
+                        else:
+                            return f"Shabbat ({holiday_name})"
+                            
+        # גיבוי: אם לא נמצא חג שתואם לתאריך השבת, נחזיר "שבת מיוחדת"
         return LANGUAGE_DATA[self.language]["special_shabbat"]
-
-    def _get_yomtov_name(self) -> str:
-        holidays = self.coordinator.data.get("holidays", [])
-        if holidays and len(holidays) > 0:
-            return holidays[0].get("name", LANGUAGE_DATA[self.language]["no_info"])
-            
-        yomtov_name = self.coordinator.data.get("yomtov_name")
-        if yomtov_name: return yomtov_name
-            
-        return LANGUAGE_DATA[self.language]["no_info"]
 
     def _get_yomtov_name(self) -> str:
         """Get Yom Tov name."""
