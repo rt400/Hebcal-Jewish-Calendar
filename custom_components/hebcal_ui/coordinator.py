@@ -621,7 +621,7 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
                 _LOGGER.debug("Added Shabbat Havdalah: %s", date_time)
             elif weekday < 4 or weekday > 5:  # Not Friday-Saturday
                 # Only update yomtov_out if this havdalah represents the end of the currently tracked holiday
-                if processed.get("yomtov_in") and processed["yomtov_in"] < date_time:
+                if not processed.get("yomtov_in") or processed["yomtov_in"] < date_time:
                     processed["yomtov_out"] = date_time
                 
                 for holiday in processed["holidays"]:
