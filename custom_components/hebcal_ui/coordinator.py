@@ -439,12 +439,17 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         _LOGGER.debug("Added manual %s event at %s", event_type, event_time)
 
     def _is_yomtov_slot_free(self, processed: dict, current_time: datetime.datetime) -> bool:
-        """Check if the yomtov slot is clear for a new holiday."""
-        if not processed.get("yomtov_in"):
-            return True
-        if processed.get("yomtov_out") and processed["yomtov_out"] < current_time:
-            return True
-        return False
+        """Check if the yomtov slot is clear for a new holiday.
+
+        Compares against the current time, not the new onset: a later onset in the
+        same window must not evict a period that is still in progress. A yomtov_out
+        with no yomtov_in (second-day havdalah whose candles were last week) and a
+        yomtov_in with no yomtov_out (end not derived yet) both count as occupied.
+        """
+        yomtov_out = processed.get("yomtov_out")
+        if yomtov_out is not None:
+            return yomtov_out < current_time
+        return processed.get("yomtov_in") is None
 
     async def _complete_missing_times(self, processed: dict[str, any]):
         """Complete missing candle lighting and Havdalah times."""
@@ -574,13 +579,13 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
                 _LOGGER.debug("Added Shabbat candle lighting: %s", date_time)
 
                 if is_yomtov_candle:
-                    if self._is_yomtov_slot_free(processed, date_time):
+                    if self._is_yomtov_slot_free(processed, datetime.datetime.now()):
                         processed["yomtov_in"] = date_time
                         processed["yomtov_out"] = None
                         _LOGGER.debug("Identified concurrent Yom Tov candle lighting: %s", date_time)
 
             elif weekday not in [4, 5]:  # Mid-week
-                if self._is_yomtov_slot_free(processed, date_time):
+                if self._is_yomtov_slot_free(processed, datetime.datetime.now()):
                     processed["yomtov_in"] = date_time
                     processed["yomtov_out"] = None
                     _LOGGER.debug("Added Yom Tov candle lighting: %s", date_time)
@@ -590,7 +595,7 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
                 processed["special_holiday"] = True
                 _LOGGER.debug("Marked special holiday on Saturday")
                 
-                if self._is_yomtov_slot_free(processed, date_time):
+                if self._is_yomtov_slot_free(processed, datetime.datetime.now()):
                     processed["yomtov_in"] = date_time
                     processed["yomtov_out"] = None
 
@@ -616,7 +621,7 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
                 _LOGGER.debug("Added Shabbat Havdalah: %s", date_time)
             elif weekday < 4 or weekday > 5:  # Not Friday-Saturday
                 # Only update yomtov_out if this havdalah represents the end of the currently tracked holiday
-                if processed.get("yomtov_in") and processed["yomtov_in"] < date_time:
+                if not processed.get("yomtov_in") or processed["yomtov_in"] < date_time:
                     processed["yomtov_out"] = date_time
                 
                 for holiday in processed["holidays"]:
