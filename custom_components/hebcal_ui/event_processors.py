@@ -1,177 +1,220 @@
-"""Functions for processing specific Hebcal calendar items."""
+"""Processes and cleans Hebcal API event items and holidays."""
 import datetime
-import logging
-import re
-from datetime import timedelta
-from typing import Dict, Any
+import unicodedata
 
-from .const import LANGUAGE_DATA
+class EventProcessor:
+    """Helper class to clean, parse, and structure raw Hebcal API items."""
 
-_LOGGER = logging.getLogger(__name__)
+    def __init__(self, zmanim_calc):
+        """Initialize with a ZmanimCalculator instance to calculate missing sunset/holiday times."""
+        self.zmanim_calc = zmanim_calc
 
-async def process_hebcal_item(coordinator, item: dict[str, any], processed: dict[str, any]):
-    """
-    Process a single Hebcal calendar item with complete logic.
-    """
-    if not item or not isinstance(item, dict):
-        _LOGGER.debug("Skipping invalid item: %s", item)
-        return
+    @staticmethod
+    def clean_item_text(item: dict[str, any]) -> dict[str, any]:
+        """Strip Hebrew vowels (Nikud) and diacritics from API textual data items recursively."""
+        if not isinstance(item, dict):
+            return item
+        cleaned = {}
+        for key, value in item.items():
+            if isinstance(value, str):
+                cleaned[key] = "".join(
+                    c for c in unicodedata.normalize("NFD", value)
+                    if not (0x0591 <= ord(c) <= 0x05C7)
+                )
+            elif isinstance(value, dict):
+                cleaned[key] = EventProcessor.clean_item_text(value)
+            elif isinstance(value, list):
+                cleaned[key] = [
+                    EventProcessor.clean_item_text(v) if isinstance(v, (dict, list, str)) else v
+                    for v in value
+                ]
+            else:
+                cleaned[key] = value
+        return cleaned
 
-    category = item.get("category")
-    if not category:
-        _LOGGER.debug("Skipping item without category: %s", item.get("title", "Unknown"))
-        return
+    def process_hebcal_item(self, item: dict[str, any], processed: dict[str, any]):
+        """Process and categorize individual items returned from Hebcal API payload."""
+        if not item or not isinstance(item, dict):
+            return
 
-    _LOGGER.debug("Processing item: %s (category: %s)", item.get("title", "Unknown"), category)
+        category = item.get("category")
+        if not category:
+            return
 
-    if "events" not in processed:
-        processed["events"] = []
-    if "special_holiday" not in processed:
-        processed["special_holiday"] = False
+        title_orig = item.get("title_orig", "")
+        title = item.get("title", "")
+        if "Rosh Hashana" in title_orig or "Rosh Hashana" in title or "ראש השנה" in title_orig:
+            processed["rosh_hashana"] = True
 
-    title_orig = item.get("title_orig", "")
-    if "Rosh Hashana" in title_orig:
-        processed["rosh_hashana"] = True
-        _LOGGER.debug("Identified Rosh Hashana event: %s", title_orig)
+        if "date" in item:
+            item["date"] = item["date"][:19]
 
-    if "date" in item:
-        item["date"] = item["date"][:19]
+        if category in ["candles", "havdalah", "parashat", "yomtov", "holiday", "omer", "roshchodesh", "mevarchim"]:
+            if category == "parashat":
+                try:
+                    item_date = datetime.datetime.fromisoformat(item["date"][:19]).date()
+                    if item_date.weekday() == 5:
+                        processed["parasha"] = item.get("title")
+                    elif not processed.get("parasha"):
+                        processed["parasha"] = item.get("title")
+                except Exception:
+                    pass
 
-    try:
-        if category == "candles":
-            await _process_candle_lighting(coordinator, item, processed)
-        elif category == "havdalah":
-            await _process_havdalah(coordinator, item, processed)
-        elif category == "parashat":
-            await _process_parasha(coordinator, item, processed)
-        elif category == "day_zmanim":
-            await _process_daily_zmanim(coordinator, item, processed)
-        elif category in ["yomtov", "holiday", "omer", "roshchodesh", "mevarchim"]:
-            await _process_holiday_event(coordinator, item, processed)
+            if category in ["yomtov", "holiday"]:
+                item["start"] = self.zmanim_calc.sunset_time_str(item["date"], -1)
+                item["end"] = self.zmanim_calc.sunset_time_str(item["date"], 0)
+                if item.get("yomtov"):
+                    processed["holidays"].append({
+                        "name": item.get("title"),
+                        "date": item.get("date")[:10],
+                        "start": item.get("start"),
+                        "end": item.get("end"),
+                        "yomtov_in": None,
+                        "yomtov_out": None
+                    })
+            processed["events"].append(item)
+
+    def complete_missing_times(self, processed: dict[str, any], havdalah_minutes: int, candle_minutes: int):
+        """Fill in missing candle lighting and havdalah times for holidays and shabbat."""
+        now = datetime.datetime.now()
+        events_to_add = {}
+
+        def add_manual(dt: datetime.datetime, cat: str):
+            key = (dt.isoformat(), cat)
+            if key not in events_to_add:
+                events_to_add[key] = True
+                self._add_manual_event(processed, cat, dt, havdalah_minutes)
+
+        api_candles = {}
+        api_havdalahs = {}
+        for ev in processed.get("events", []):
+            cat = ev.get("category")
+            if cat not in ["candles", "havdalah"]:
+                continue
+            ev_date = ev.get("date", "")[:10]
+            dt = datetime.datetime.fromisoformat(ev["date"][:19])
+            if cat == "candles":
+                api_candles[ev_date] = dt
+            else:
+                api_havdalahs[ev_date] = dt
+
+        sorted_holidays = sorted(processed.get("holidays", []), key=lambda h: h["date"])
+        for i, holiday in enumerate(sorted_holidays):
+            h_date = datetime.datetime.fromisoformat(holiday["date"][:10]).date()
+            eve_date = h_date - datetime.timedelta(days=1)
+
+            y_in = api_candles.get(eve_date.isoformat()) or api_candles.get(h_date.isoformat())
+            if y_in:
+                holiday["yomtov_in"] = y_in
+            else:
+                y_in = self.zmanim_calc.get_offline_missing_time(h_date, "candles", -1)
+                holiday["yomtov_in"] = y_in
+                if y_in: add_manual(y_in, "candles")
+
+            has_next_holiday = (i + 1 < len(sorted_holidays)) and \
+                               (datetime.datetime.fromisoformat(
+                                   sorted_holidays[i + 1]["date"][:10]).date() == h_date + datetime.timedelta(days=1))
+
+            y_out = api_havdalahs.get(h_date.isoformat())
+
+            if y_out:
+                holiday["yomtov_out"] = y_out
+            elif has_next_holiday:
+                next_in = api_candles.get(h_date.isoformat())
+                if next_in:
+                    holiday["yomtov_out"] = next_in
+                else:
+                    calc_out = self.zmanim_calc.get_offline_missing_time(h_date, "candles", 0)
+                    holiday["yomtov_out"] = calc_out
+                    if calc_out: add_manual(calc_out, "candles")
+            else:
+                calc_out = self.zmanim_calc.get_offline_missing_time(h_date, "havdalah", 0)
+                holiday["yomtov_out"] = calc_out
+                if calc_out: add_manual(calc_out, "havdalah")
+
+        shabbats = []
+        if processed.get("events"):
+            any_date = datetime.datetime.fromisoformat(processed["events"][0]["date"][:19]).date()
+            days_to_friday = (4 - any_date.weekday()) % 7
+            friday_date = any_date + datetime.timedelta(days=days_to_friday)
+            saturday_date = friday_date + datetime.timedelta(days=1)
+
+            s_in = api_candles.get(friday_date.isoformat())
+            if not s_in:
+                s_in = self.zmanim_calc.get_offline_missing_time(friday_date, "candles", 0)
+                if s_in: add_manual(s_in, "candles")
+
+            s_out = api_havdalahs.get(saturday_date.isoformat())
+            if not s_out:
+                sunday_date = saturday_date + datetime.timedelta(days=1)
+                is_sunday_holiday = any(
+                    h["date"][:10] == sunday_date.isoformat() for h in processed.get("holidays", []))
+
+                if is_sunday_holiday:
+                    s_out = api_candles.get(saturday_date.isoformat())
+                    if not s_out:
+                        s_out = self.zmanim_calc.get_offline_missing_time(saturday_date, "candles", 0)
+                        if s_out: add_manual(s_out, "candles")
+                else:
+                    s_out = self.zmanim_calc.get_offline_missing_time(saturday_date, "havdalah", 0)
+                    if s_out: add_manual(s_out, "havdalah")
+
+            if s_in and s_out:
+                shabbats.append({"in": s_in, "out": s_out})
+
+        merged_blocks = []
+        current_block = None
+
+        all_periods = [{"in": h["yomtov_in"], "out": h["yomtov_out"]} for h in processed.get("holidays", []) if
+                       h.get("yomtov_in") and h.get("yomtov_out")]
+        all_periods.extend(shabbats)
+        all_periods.sort(key=lambda x: x["in"])
+
+        for p in all_periods:
+            if not current_block:
+                current_block = {"in": p["in"], "out": p["out"]}
+            else:
+                if (p["in"] - current_block["out"]).total_seconds() < 10800:
+                    current_block["out"] = max(current_block["out"], p["out"])
+                else:
+                    merged_blocks.append(current_block)
+                    current_block = {"in": p["in"], "out": p["out"]}
+        if current_block:
+            merged_blocks.append(current_block)
+
+        active_or_next = None
+        for block in merged_blocks:
+            if block["in"] <= now <= block["out"]:
+                active_or_next = block
+                break
+            elif block["in"] > now and not active_or_next:
+                active_or_next = block
+
+        if not active_or_next and merged_blocks:
+            active_or_next = merged_blocks[-1]
+
+        if active_or_next:
+            processed["yomtov_in"] = active_or_next["in"]
+            processed["yomtov_out"] = active_or_next["out"]
+
+        if shabbats:
+            active_shabbat = next((s for s in shabbats if s["in"] <= now <= s["out"]), shabbats[-1])
+            processed["shabbat_in"] = active_shabbat["in"]
+            processed["shabbat_out"] = active_shabbat["out"]
+
+    @staticmethod
+    def _add_manual_event(processed: dict, event_type: str, event_time: datetime.datetime, havdalah_minutes: int):
+        """Append manual backup events (candles or havdalah) to the event list."""
+        if event_type == "havdalah":
+            title = "הבדלה - ידני"
+            hebrew = f"הבדלה - {havdalah_minutes} דקות"
         else:
-            _LOGGER.debug("Unhandled category: %s", category)
-
-    except Exception as err:
-        _LOGGER.warning("Error processing item %s: %s", item.get("title", "Unknown"), err)
-
-async def _process_candle_lighting(coordinator, item: dict[str, any], processed: dict[str, any]):
-    try:
-        date_time = datetime.datetime.fromisoformat(item["date"])
-        weekday = date_time.weekday()  
-
-        if weekday == 4:  
-            processed["shabbat_in"] = date_time
-            _LOGGER.debug("Added Shabbat candle lighting: %s", date_time)
-
-            memo = item.get("memo", "")
-            if "רֹאשׁ הַשָּׁנָה" in memo or "Rosh Hashana" in memo or "Yom Tov" in memo or "חג" in memo:
-                if not processed.get("yomtov_in"):  
-                    processed["yomtov_in"] = date_time
-                _LOGGER.debug("Identified concurrent Yom Tov candle lighting: %s", date_time)
-
-        elif weekday not in [4, 5]:  
-            if not processed.get("yomtov_in"):
-                processed["yomtov_in"] = date_time
-                _LOGGER.debug("Added Yom Tov candle lighting: %s", date_time)
-        elif weekday == 5:  
-            processed["special_holiday"] = True
-            _LOGGER.debug("Marked special holiday on Saturday: %s", item.get("title"))
-
-        for holiday in processed.get("holidays", []):
-            if holiday["date"] == (date_time.date() + timedelta(days=1)).isoformat():
-                if not holiday.get("yomtov_in"):  
-                    holiday["yomtov_in"] = date_time
-
-        processed["events"].append(item)
-    except (ValueError, KeyError) as err:
-        _LOGGER.warning("Error processing candle lighting item: %s", err)
-
-async def _process_havdalah(coordinator, item: dict[str, any], processed: dict[str, any]):
-    try:
-        date_time = datetime.datetime.fromisoformat(item["date"])
-        weekday = date_time.weekday()
-
-        if weekday == 5:  
-            processed["shabbat_out"] = date_time
-            processed["events"].append(item)
-            _LOGGER.debug("Added Shabbat Havdalah: %s", date_time)
-        elif weekday < 4 or weekday > 5:  
-            processed["yomtov_out"] = date_time
-            for holiday in processed.get("holidays", []):
-                if holiday["date"] == date_time.date().isoformat():
-                    holiday["yomtov_out"] = date_time
-            processed["events"].append(item)
-            _LOGGER.debug("Added Yom Tov Havdalah: %s", date_time)
-
-    except (ValueError, KeyError) as err:
-        _LOGGER.warning("Error processing Havdalah item: %s", err)
-
-async def _process_parasha(coordinator, item: dict[str, any], processed: dict[str, any]):
-    try:
-        processed["parasha"] = item.get("title")
-        processed["events"].append(item)
-        _LOGGER.debug("Added Parasha: %s", item.get("title"))
-    except Exception as err:
-        _LOGGER.warning("Error processing Parasha item: %s", err)
-
-async def _process_daily_zmanim(coordinator, item: dict[str, any], processed: dict[str, any]):
-    """Process daily Zmanim (prayer times) data."""
-    try:
-        zmanim_data = _process_zmanim_helper(coordinator, item) 
-        
-        # NOTE: WE DO NOT OVERWRITE processed["zmanim"] HERE ANYMORE TO AVOID DESTROYING HDATE DATA
-        # processed["zmanim"] = zmanim_data
-        
-        processed["events"].append(zmanim_data)
-        _LOGGER.debug("Added daily Zmanim data to events")
-    except Exception as err:
-        _LOGGER.warning("Error processing Zmanim item: %s", err)
-
-def _process_zmanim_helper(coordinator, item: Dict[str, Any]) -> Dict[str, str]:
-    zmanim = {}
-    try:
-        for key in LANGUAGE_DATA[coordinator.language].get("zmanim", {}):
-            if key in item:
-                time_str = item[key][11:16]  
-                if coordinator.use_12h_time:
-                    temp_time = datetime.datetime.strptime(time_str, "%H:%M")
-                    time_str = temp_time.strftime("%I:%M %p")
-                localized_name = LANGUAGE_DATA[coordinator.language]["zmanim"][key]
-                zmanim[localized_name] = time_str
-        zmanim['title'] = 'day_zmanim'
-    except Exception as err:
-        _LOGGER.warning("Error processing Zmanim data: %s", err)
-    return zmanim
-
-async def _process_holiday_event(coordinator, item: dict[str, any], processed: dict[str, any]):
-    try:
-        item["start"] = coordinator.sunset_time(item["date"], -1) 
-        item["end"] = coordinator.sunset_time(item["date"], 0)    
-        processed["events"].append(item)
-
-        if item.get("yomtov"):
-            if "holidays" not in processed:
-                processed["holidays"] = []
-            holiday_info = {
-                "name": item.get("title"),
-                "date": item.get("date"),
-                "start": item.get("start"),
-                "end": item.get("end"),
-                "yomtov_in": None, 
-                "yomtov_out": None 
-            }
-            processed["holidays"].append(holiday_info)
-            _LOGGER.debug("Added holiday to list: %s", item.get("title"))
-
-        if item.get("category") == "omer":
-            title = item.get("title", "")
-            try:
-                match = re.search(r'(\d+)', title)
-                if match:
-                    processed["omer_day"] = int(match.group(1))
-            except Exception:
-                pass
-
-        _LOGGER.debug("Added holiday event: %s", item.get("title"))
-    except Exception as err:
-        _LOGGER.warning("Error processing holiday item: %s", err)
+            title = "הדלקת נרות - ידני"
+            hebrew = "הדלקת נרות"
+        processed["events"].append({
+            "className": event_type,
+            "hebrew": hebrew,
+            "date": event_time.isoformat(),
+            "allDay": False,
+            "title": title,
+        })
