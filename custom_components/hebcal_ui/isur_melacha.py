@@ -1,28 +1,14 @@
-"""Calculates the Issur Melacha (work prohibition) period."""
+"""Calculates the Issur Melacha (work prohibition) period and manages related logic."""
 import datetime
 import logging
 from datetime import timedelta
-from typing import Dict, Any, Tuple, Optional
 
 _LOGGER = logging.getLogger(__name__)
 
 def calculate_isur_melacha_period(coordinator, data: dict[str, any]) -> dict[str, any]:
-    """
-    Calculate comprehensive Issur Melacha period information.
-
-    This method determines when work is prohibited according to Jewish law,
-    including complex scenarios where Shabbat and Yom Tov overlap or are consecutive.
-
-    Args:
-        coordinator: The HebcalDataUpdateCoordinator instance.
-        data: Processed data containing Shabbat and Yom Tov times
-
-    Returns:
-        Dictionary with complete Issur Melacha information for JSON storage
-    """
+    """Calculate comprehensive Issur Melacha period information."""
     now = datetime.datetime.now()
 
-    # Initialize result structure
     result = {
         "active": False,
         "start": None,
@@ -57,10 +43,6 @@ def calculate_isur_melacha_period(coordinator, data: dict[str, any]) -> dict[str
     yomtov_in = data.get("yomtov_in")
     yomtov_out = data.get("yomtov_out")
 
-    _LOGGER.debug("Calculating Issur Melacha - Shabbat: %s to %s, Yom Tov: %s to %s",
-                  shabbat_in, shabbat_out, yomtov_in, yomtov_out)
-
-    # Add component times for reference
     if shabbat_in:
         result["components"]["shabbat_times"]["candles"] = shabbat_in.isoformat()
         result["components"]["shabbat_times"]["candles_formatted"] = shabbat_in.strftime("%H:%M")
@@ -78,13 +60,11 @@ def calculate_isur_melacha_period(coordinator, data: dict[str, any]) -> dict[str
         result["components"]["yomtov_times"]["havdalah_formatted"] = yomtov_out.strftime("%H:%M")
         result["components"]["yomtov_times"]["havdalah_day"] = yomtov_out.strftime("%A")
 
-    # Check individual component status
     if shabbat_in and shabbat_out:
         result["components"]["shabbat_active"] = shabbat_in <= now <= shabbat_out
     if yomtov_in and yomtov_out:
         result["components"]["yomtov_active"] = yomtov_in <= now <= yomtov_out
 
-    # Determine the combined Issur Melacha period using helper functions
     period_info = (
         _get_case_shabbat_through_yomtov(shabbat_in, yomtov_out) or
         _get_case_yomtov_thursday_through_shabbat(yomtov_in, shabbat_out) or
@@ -104,13 +84,11 @@ def calculate_isur_melacha_period(coordinator, data: dict[str, any]) -> dict[str
         _populate_period_times(result, period_start, period_end)
         _populate_period_status(result, now, period_start, period_end, coordinator.format_time_delta)
 
-    # Add special case information
     if data.get("rosh_hashana"):
         result["special_cases"].append("Rosh Hashana (2 days)")
     if data.get("special_holiday"):
         result["special_cases"].append("Special Holiday")
 
-    # Add next events information
     next_candles = coordinator.next_candle_lighting
     if next_candles:
         result["next_events"]["candle_lighting"] = next_candles.isoformat()
@@ -121,58 +99,29 @@ def calculate_isur_melacha_period(coordinator, data: dict[str, any]) -> dict[str
         result["next_events"]["havdalah"] = next_havdalah.isoformat()
         result["next_events"]["havdalah_formatted"] = next_havdalah.strftime("%A %H:%M")
 
-    _LOGGER.debug("Issur Melacha calculation completed: %s", result["type"])
     return result
 
 def _get_case_shabbat_through_yomtov(shabbat_in, yomtov_out):
-    """Case 1: Yom Tov ends on Sunday, creating a continuous period from Shabbat."""
-    if shabbat_in and yomtov_out and yomtov_out > shabbat_in and yomtov_out.weekday() == 6:  # Sunday
-        _LOGGER.debug("Issur Melacha Case: Shabbat through Yom Tov ending Sunday")
-        return (
-            shabbat_in,
-            yomtov_out,
-            "shabbat_through_yomtov",
-            "שבת עד יום טוב (יום ראשון)",
-            "Yom Tov ending Sunday after Shabbat",
-        )
+    if shabbat_in and yomtov_out and yomtov_out > shabbat_in and yomtov_out.weekday() == 6:
+        return shabbat_in, yomtov_out, "shabbat_through_yomtov", "שבת עד יום טוב (יום ראשון)", "Yom Tov ending Sunday after Shabbat"
     return None
 
 def _get_case_yomtov_thursday_through_shabbat(yomtov_in, shabbat_out):
-    """Case 2: Yom Tov starts on Thursday, creating a continuous period into Shabbat."""
-    if yomtov_in and shabbat_out and yomtov_in.weekday() == 3:  # Thursday
-        _LOGGER.debug("Issur Melacha Case: Yom Tov Thursday through Shabbat")
-        return (
-            yomtov_in,
-            shabbat_out,
-            "yomtov_thursday_through_shabbat",
-            "יום טוב (חמישי) עד שבת",
-            "Yom Tov starting Thursday before Shabbat",
-        )
+    if yomtov_in and shabbat_out and yomtov_in.weekday() == 3:
+        return yomtov_in, shabbat_out, "yomtov_thursday_through_shabbat", "יום טוב (חמישי) עד שבת", "Yom Tov starting Thursday before Shabbat"
     return None
 
 def _get_case_yomtov_friday_through_shabbat(yomtov_in, yomtov_out, shabbat_out):
-    """Case 3: Yom Tov ends on Friday, creating a continuous period into Shabbat."""
-    # This case is for a 1-day Yom Tov on Friday. Candle lighting (yomtov_in) is on Thursday.
-    if yomtov_in and shabbat_out and yomtov_in.weekday() == 3:  # Thursday
-        _LOGGER.debug("Issur Melacha Case: Yom Tov on Friday through Shabbat")
-        return (
-            yomtov_in,
-            shabbat_out,
-            "yomtov_through_shabbat_friday",
-            "יום טוב (שישי) עד שבת",
-            "Yom Tov on Friday before Shabbat",
-        )
+    if yomtov_in and shabbat_out and yomtov_in.weekday() == 3:
+        return yomtov_in, shabbat_out, "yomtov_through_shabbat_friday", "יום טוב (שישי) עד שבת", "Yom Tov on Friday before Shabbat"
     return None
 
 def _get_individual_or_upcoming_period(now, shabbat_in, shabbat_out, yomtov_in, yomtov_out):
-    """Handle individual active periods or find the next upcoming period."""
-    # Check for currently active individual periods
     if shabbat_in and shabbat_out and shabbat_in <= now <= shabbat_out:
         return shabbat_in, shabbat_out, "shabbat_only", "שבת בלבד", None
     if yomtov_in and yomtov_out and yomtov_in <= now <= yomtov_out:
         return yomtov_in, yomtov_out, "yomtov_only", "יום טוב בלבד", None
 
-    # Find the earliest upcoming period
     upcoming_periods = []
     if shabbat_in and shabbat_out and shabbat_in > now:
         upcoming_periods.append((shabbat_in, shabbat_out, "shabbat_upcoming", "שבת הבא", None))
@@ -182,11 +131,9 @@ def _get_individual_or_upcoming_period(now, shabbat_in, shabbat_out, yomtov_in, 
     if upcoming_periods:
         upcoming_periods.sort(key=lambda x: x[0])
         return upcoming_periods[0]
-
     return None
 
 def _populate_period_times(result, period_start, period_end):
-    """Populate the result dict with start/end times and duration."""
     result["start"] = period_start
     result["end"] = period_end
     result["start_formatted"] = period_start.strftime("%H:%M")
@@ -208,7 +155,6 @@ def _populate_period_times(result, period_start, period_end):
         result["duration_formatted_hebrew"] = f"{duration_hours:.1f} שעות"
 
 def _populate_period_status(result, now, period_start, period_end, format_time_delta_func):
-    """Populate the result dict with active status and time until start/end."""
     is_active = period_start <= now <= period_end
     result["active"] = is_active
 
@@ -228,7 +174,7 @@ def _populate_period_status(result, now, period_start, period_end, format_time_d
         result["status_hebrew"] = f"איסור מלאכה מתחיל בעוד {result['time_until_start_formatted']}"
         result["work_status"] = "Permitted"
         result["work_status_hebrew"] = "מותר"
-    else: # Period has passed
+    else:
         result["status_hebrew"] = "איסור מלאכה הסתיים"
         result["work_status"] = "Permitted"
         result["work_status_hebrew"] = "מותר"
