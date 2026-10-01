@@ -8,6 +8,9 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/rt400/Hebcal-Jewish-Calendar/issues",
-  "requirements": ["aiofiles", "aiozoneinfo", "hdate==1.1.2"],
+  "requirements": [
+    "aiofiles",
+    "hdate==1.2.2"
+  ],
   "version": "4.1.0"
 }
