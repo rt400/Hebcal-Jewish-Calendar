@@ -10,7 +10,7 @@
   "issue_tracker": "https://github.com/rt400/Hebcal-Jewish-Calendar/issues",
   "requirements": [
     "aiofiles",
-    "hdate==1.2.2"
+    "hdate"
   ],
   "version": "4.1.0"
 }
