@@ -481,3 +481,25 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         """Return the duration of the isur melacha period in hours."""
         period = self.isur_melacha_period
         return period.get('duration_hours', 0)
+
+    def get_time_until_isur_melacha_start(self) -> timedelta | None:
+        """Calculate time until the next isur melacha starts."""
+        period = self.isur_melacha_period
+        seconds = period.get('time_until_start')
+        return timedelta(seconds=seconds) if seconds and seconds > 0 else None
+
+    def get_time_until_isur_melacha_end(self) -> timedelta | None:
+        """Calculate time until the current isur melacha ends."""
+        period = self.isur_melacha_period
+        seconds = period.get('time_until_end')
+        return timedelta(seconds=seconds) if seconds and seconds > 0 else None
+
+    def format_isur_melacha_status(self) -> str:
+        """Return the formatted Hebrew status of the isur melacha period."""
+        period = self.isur_melacha_period
+        return period.get('status_hebrew', 'אין איסור מלאכה')
+
+    def get_isur_melacha_type_description(self) -> str:
+        """Return the Hebrew description of the isur melacha type."""
+        period = self.isur_melacha_period
+        return period.get('type_hebrew', 'אין איסור מלאכה')
