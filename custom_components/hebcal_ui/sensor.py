@@ -27,6 +27,7 @@ from .const import (
     DEFAULT_OMER_COUNT_TYPE,
 )
 from .coordinator import HebcalDataUpdateCoordinator
+from .helpers import CoordinatorHelpers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,15 +76,26 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         
         self.language = entry.options.get(CONF_LANGUAGE, entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE))
         
-        self._attr_name = sensor_config["name"][self.language]
+        # Retrieve entity name safely based on language
+        self._attr_name = sensor_config["name"].get(
+            self.language, 
+            sensor_config["name"].get("hebrew" if CoordinatorHelpers.is_hebrew(self.language) else "english", english_entity_name)
+        )
         self._attr_icon = sensor_config["icon"]
         self._attr_device_class = sensor_config["device_class"]
-        self._attr_native_unit_of_measurement = sensor_config["unit"]
+        self._attr_native_unit_of_measurement = sensor_config.get("unit")
         
         self.use_12h_time = entry.options.get(CONF_USE_12H_TIME, entry.data.get(CONF_USE_12H_TIME, DEFAULT_USE_12H_TIME))
         self.omer_count_type = entry.options.get(CONF_OMER_COUNT_TYPE, entry.data.get(CONF_OMER_COUNT_TYPE, DEFAULT_OMER_COUNT_TYPE))
         
         self._timer_remover = None
+
+    def _get_lang_text(self, key: str, default: str = "") -> str:
+        """Safely fetch translations, handling 'he' vs 'hebrew' differences."""
+        lang = self.language
+        if lang not in LANGUAGE_DATA:
+            lang = "hebrew" if CoordinatorHelpers.is_hebrew(self.language) else "english"
+        return LANGUAGE_DATA.get(lang, {}).get(key, default)
 
     @property
     def device_info(self) -> Dict[str, Any]:
@@ -165,13 +177,13 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
     def native_value(self) -> Any:
         """Return the state of the sensor."""
         if not self.coordinator.data:
-            return LANGUAGE_DATA[self.language]["no_info"]
+            return self._get_lang_text("no_info", "No info")
         
         method_name = f"_get_{self.sensor_type}"
         if hasattr(self, method_name):
             return getattr(self, method_name)()
         
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -197,26 +209,28 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
                     pass
                     
             if isinstance(dt_val, datetime.datetime):
-                if self.language == "hebrew":
+                if CoordinatorHelpers.is_hebrew(self.language):
                     attributes["תאריך_מלא"] = dt_val.strftime("%d/%m/%Y %H:%M")
                     attributes["תאריך"] = dt_val.strftime("%d/%m/%Y")
                     attributes["שעה"] = self._format_time(dt_val)
+                    attributes["יום"] = CoordinatorHelpers.get_localized_day(dt_val, self.language)
                 else:
                     attributes["full_date"] = dt_val.strftime("%Y-%m-%d %H:%M")
                     attributes["date"] = dt_val.strftime("%Y-%m-%d")
                     attributes["time"] = self._format_time(dt_val)
+                    attributes["day"] = CoordinatorHelpers.get_localized_day(dt_val, self.language)
                     
         return attributes
 
     def _get_shabbat_in(self) -> str:
         shabbat_in = self.coordinator.data.get("shabbat_in")
         if shabbat_in: return self._format_time(shabbat_in)
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     def _get_shabbat_out(self) -> str:
         shabbat_out = self.coordinator.data.get("shabbat_out")
         if shabbat_out: return self._format_time(shabbat_out)
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     def _get_yomtov_in(self) -> str:
         yomtov_in = self.coordinator.data.get("yomtov_in")
@@ -236,7 +250,7 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
                 if dt_in.date() >= now.date():
                     return self._format_time(yomtov_in)
                     
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     def _get_yomtov_out(self) -> str:
         yomtov_out = self.coordinator.data.get("yomtov_out")
@@ -249,21 +263,18 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             if dt_out.date() >= now.date():
                 return self._format_time(yomtov_out)
                 
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     def _get_parasha(self) -> str:
         """Get Torah portion."""
         parasha = self.coordinator.data.get("parasha")
         
-        # אם יש פרשה רגילה, נחזיר אותה
         if parasha:
             return parasha
             
-        # אם אין פרשה (למשל כי זה שבת-חג), נחפש חג שנופל בדיוק על שבת
         shabbat_out = self.coordinator.data.get("shabbat_out")
         shabbat_date = None
         
-        # חילוץ בטוח של התאריך של יום השבת
         if isinstance(shabbat_out, str):
             try:
                 if shabbat_out.endswith('Z'):
@@ -275,25 +286,21 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         elif isinstance(shabbat_out, datetime.datetime):
             shabbat_date = shabbat_out.date()
             
-        # אם מצאנו את תאריך השבת, נעבור על כל החגים של השבוע
         if shabbat_date:
             holidays = self.coordinator.data.get("holidays", [])
             for holiday in holidays:
                 holiday_date_str = holiday.get("date", "")
                 
-                # בודקים אם התאריך של החג זהה בדיוק לתאריך של השבת (10 התווים הראשונים = YYYY-MM-DD)
                 if isinstance(holiday_date_str, str) and len(holiday_date_str) >= 10:
                     if holiday_date_str[:10] == shabbat_date.isoformat():
                         holiday_name = holiday.get("name", "")
                         
-                        # מחזירים את התצוגה המבוקשת לפי השפה
-                        if self.language == "hebrew":
+                        if CoordinatorHelpers.is_hebrew(self.language):
                             return f"שבת ({holiday_name})"
                         else:
                             return f"Shabbat ({holiday_name})"
                             
-        # גיבוי: אם לא נמצא חג שתואם לתאריך השבת, נחזיר "שבת מיוחדת"
-        return LANGUAGE_DATA[self.language]["special_shabbat"]
+        return self._get_lang_text("special_shabbat", "Special Shabbat")
 
     def _get_yomtov_name(self) -> str:
         """Get Yom Tov name."""
@@ -302,10 +309,8 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         
         if holidays:
             for holiday in holidays:
-                # חיפוש זמן סיום החג (צאת החג או השקיעה)
                 end_time = holiday.get("yomtov_out") or holiday.get("end")
                 
-                # המרה בטוחה של זמן הסיום ל-datetime במידה והוא טקסט
                 if isinstance(end_time, str):
                     try:
                         if end_time.endswith('Z'):
@@ -316,30 +321,26 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
                     except (ValueError, TypeError):
                         pass
                 
-                # מחזירים את החג הראשון שעוד לא נגמר (זמן הסיום שלו מאוחר מעכשיו)
                 if isinstance(end_time, datetime.datetime) and end_time >= now:
-                    return holiday.get("name", LANGUAGE_DATA[self.language]["no_info"])
+                    return holiday.get("name", self._get_lang_text("no_info", "No info"))
                 
-                # גיבוי: אם לא הצלחנו למצוא שעת סיום מדויקת, נבדוק לפי התאריך הכללי
                 elif not isinstance(end_time, datetime.datetime):
                     holiday_date_str = holiday.get("date", "")
                     if isinstance(holiday_date_str, str) and len(holiday_date_str) >= 10:
                         if holiday_date_str[:10] >= now.date().isoformat():
-                            return holiday.get("name", LANGUAGE_DATA[self.language]["no_info"])
+                            return holiday.get("name", self._get_lang_text("no_info", "No info"))
             
-            # אם כל החגים ברשימה כבר עברו, החזר ערך ריק/אין מידע
-            return LANGUAGE_DATA[self.language]["no_info"]
+            return self._get_lang_text("no_info", "No info")
 
-        # תמיכה לאחור במידה ו-yomtov_name מוגדר ישירות (ללא רשימה)
         yomtov_name = self.coordinator.data.get("yomtov_name")
         if yomtov_name: 
             return yomtov_name
             
-        return LANGUAGE_DATA[self.language]["no_info"]
+        return self._get_lang_text("no_info", "No info")
 
     def _get_omer_day(self) -> str:
         if not self.coordinator.data:
-            return LANGUAGE_DATA[self.language]["no_omer"]
+            return self._get_lang_text("no_omer", "No Omer")
 
         now = datetime.datetime.now()
         sunset = self.coordinator.data.get("zmanim", {}).get("shkia")
@@ -368,7 +369,7 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
 
         if day_num and 1 <= day_num <= 49:
             return OMER_DAYS[self.omer_count_type].get(day_num, "")
-        return LANGUAGE_DATA[self.language]["no_omer"]
+        return self._get_lang_text("no_omer", "No Omer")
 
     def _get_hebrew_date(self) -> str:
         now = datetime.datetime.now()
@@ -389,22 +390,22 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             date_to_show = hebrew_date_data.get("today", {})
 
         if not date_to_show:
-            return LANGUAGE_DATA[self.language]["no_info"]
+            return self._get_lang_text("no_info", "No info")
 
-        if self.language == "hebrew":
+        if CoordinatorHelpers.is_hebrew(self.language):
             return date_to_show.get("hebrew", "")
         else:
-            weekday = gregorian_date_for_weekday.strftime("%A")
+            weekday = CoordinatorHelpers.get_localized_day(gregorian_date_for_weekday, self.language)
             english_date = date_to_show.get("english", "")
-            if not english_date: return LANGUAGE_DATA[self.language]["no_info"]
+            if not english_date: return self._get_lang_text("no_info", "No info")
             return f"{weekday}, {english_date}"
 
     def _get_zmanim(self) -> str:
         today = datetime.date.today()
-        if self.language == "hebrew":
-            return f"זמנים הלכתיים עבור יום {today}"
+        if CoordinatorHelpers.is_hebrew(self.language):
+            return f"זמנים הלכתיים עבור {today.strftime('%d/%m/%Y')}"
         else:
-            return f"Halachic times for {today}"
+            return f"Halachic times for {today.strftime('%Y-%m-%d')}"
 
     def _get_zmanim_attributes(self) -> Dict[str, Any]:
         """Get Zmanim as attributes."""
@@ -420,7 +421,8 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
                     formatted_time = self._format_time(time_dt)
                     
                     if key in ZMANIM_TRANSLATIONS:
-                        translated_key = ZMANIM_TRANSLATIONS[key].get(self.language, key)
+                        lang_key = "hebrew" if CoordinatorHelpers.is_hebrew(self.language) else "english"
+                        translated_key = ZMANIM_TRANSLATIONS[key].get(self.language, ZMANIM_TRANSLATIONS[key].get(lang_key, key))
                         attributes[translated_key] = formatted_time
                     else:
                         attributes[key] = formatted_time
