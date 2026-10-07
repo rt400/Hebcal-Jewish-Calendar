@@ -111,9 +111,9 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
             diaspora=self.diaspora_mode
         )
 
-        # Initialize helper modules
+        # Initialize helper modules, passing language to the processor
         self.zmanim_calc = ZmanimCalculator(self.offline_hebcal, self.candle_minutes, self.havdalah_minutes)
-        self.event_processor = EventProcessor(self.zmanim_calc)
+        self.event_processor = EventProcessor(self.zmanim_calc, self.language)
 
     async def async_setup(self) -> None:
         """Set up the coordinator, schedule daily refreshes, and trigger initial update."""
@@ -322,7 +322,7 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
             self.event_processor.process_hebcal_item(item, processed)
 
         self.event_processor.complete_missing_times(processed, self.havdalah_minutes, self.candle_minutes)
-        processed["isur_melacha"] = calculate_isur_melacha_period(self, processed)
+        processed["isur_melacha"] = calculate_isur_melacha_period(processed, self.language)
         return processed
 
     async def _save_data_to_file(self, data: dict[str, any]):
@@ -440,9 +440,9 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         return event_time - now
 
     def format_time_delta(self, delta: timedelta) -> str:
-        """Format a timedelta object into a readable English string representation."""
-        return CoordinatorHelpers.format_time_delta(delta)
-        
+        """Format a timedelta object into a readable localized string representation."""
+        return CoordinatorHelpers.format_time_delta(delta, self.language)
+
     @property
     def isur_melacha_period(self) -> Dict[str, Any]:
         """Return the complete isur melacha period dictionary."""
@@ -495,11 +495,11 @@ class HebcalDataUpdateCoordinator(DataUpdateCoordinator[dict[str, any]]):
         return timedelta(seconds=seconds) if seconds and seconds > 0 else None
 
     def format_isur_melacha_status(self) -> str:
-        """Return the formatted Hebrew status of the isur melacha period."""
+        """Return the formatted status of the isur melacha period."""
         period = self.isur_melacha_period
-        return period.get('status_hebrew', 'אין איסור מלאכה')
+        return period.get('status_text', 'Unknown')
 
     def get_isur_melacha_type_description(self) -> str:
-        """Return the Hebrew description of the isur melacha type."""
+        """Return the description of the isur melacha type."""
         period = self.isur_melacha_period
-        return period.get('type_hebrew', 'אין איסור מלאכה')
+        return period.get('type_description', 'Unknown')
