@@ -1,17 +1,19 @@
 """Processes and cleans Hebcal API event items and holidays."""
 import datetime
 import unicodedata
+from .helpers import CoordinatorHelpers
 
 class EventProcessor:
     """Helper class to clean, parse, and structure raw Hebcal API items."""
 
-    def __init__(self, zmanim_calc):
-        """Initialize with a ZmanimCalculator instance to calculate missing sunset/holiday times."""
+    def __init__(self, zmanim_calc, language: str = "he"):
+        """Initialize with a ZmanimCalculator instance and language preference."""
         self.zmanim_calc = zmanim_calc
+        self.language = language
 
     @staticmethod
     def clean_item_text(item: dict[str, any]) -> dict[str, any]:
-        """Strip Hebrew vowels (Nikud) and diacritics from API textual data items recursively."""
+        """Strip Hebrew vowels (Nikud) from API textual data items recursively."""
         if not isinstance(item, dict):
             return item
         cleaned = {}
@@ -162,58 +164,57 @@ class EventProcessor:
             if s_in and s_out:
                 shabbats.append({"in": s_in, "out": s_out})
 
-        merged_blocks = []
-        current_block = None
-
-        all_periods = [{"in": h["yomtov_in"], "out": h["yomtov_out"]} for h in processed.get("holidays", []) if
-                       h.get("yomtov_in") and h.get("yomtov_out")]
-        all_periods.extend(shabbats)
-        all_periods.sort(key=lambda x: x["in"])
-
-        for p in all_periods:
-            if not current_block:
-                current_block = {"in": p["in"], "out": p["out"]}
-            else:
-                if (p["in"] - current_block["out"]).total_seconds() < 10800:
-                    current_block["out"] = max(current_block["out"], p["out"])
-                else:
-                    merged_blocks.append(current_block)
-                    current_block = {"in": p["in"], "out": p["out"]}
-        if current_block:
-            merged_blocks.append(current_block)
-
-        active_or_next = None
-        for block in merged_blocks:
-            if block["in"] <= now <= block["out"]:
-                active_or_next = block
-                break
-            elif block["in"] > now and not active_or_next:
-                active_or_next = block
-
-        if not active_or_next and merged_blocks:
-            active_or_next = merged_blocks[-1]
-
-        if active_or_next:
-            processed["yomtov_in"] = active_or_next["in"]
-            processed["yomtov_out"] = active_or_next["out"]
-
         if shabbats:
-            active_shabbat = next((s for s in shabbats if s["in"] <= now <= s["out"]), shabbats[-1])
+            active_shabbat = next((s for s in shabbats if s["in"] <= now <= s["out"]), None)
+            if not active_shabbat:
+                active_shabbat = next((s for s in shabbats if s["in"] > now), shabbats[-1])
             processed["shabbat_in"] = active_shabbat["in"]
             processed["shabbat_out"] = active_shabbat["out"]
-
-    @staticmethod
-    def _add_manual_event(processed: dict, event_type: str, event_time: datetime.datetime, havdalah_minutes: int):
-        """Append manual backup events (candles or havdalah) to the event list."""
-        if event_type == "havdalah":
-            title = "הבדלה - ידני"
-            hebrew = f"הבדלה - {havdalah_minutes} דקות"
         else:
-            title = "הדלקת נרות - ידני"
-            hebrew = "הדלקת נרות"
+            processed["shabbat_in"] = None
+            processed["shabbat_out"] = None
+
+        raw_yomtovs = [{"in": h["yomtov_in"], "out": h["yomtov_out"]} for h in processed.get("holidays", []) if h.get("yomtov_in") and h.get("yomtov_out")]
+        raw_yomtovs.sort(key=lambda x: x["in"])
+        
+        merged_yomtovs = []
+        current_yt = None
+        for yt in raw_yomtovs:
+            if not current_yt:
+                current_yt = {"in": yt["in"], "out": yt["out"]}
+            else:
+                if (yt["in"] - current_yt["out"]).total_seconds() < 10800:
+                    current_yt["out"] = max(current_yt["out"], yt["out"])
+                else:
+                    merged_yomtovs.append(current_yt)
+                    current_yt = {"in": yt["in"], "out": yt["out"]}
+        if current_yt:
+            merged_yomtovs.append(current_yt)
+
+        if merged_yomtovs:
+            active_yt = next((y for y in merged_yomtovs if y["in"] <= now <= y["out"]), None)
+            if not active_yt:
+                active_yt = next((y for y in merged_yomtovs if y["in"] > now), merged_yomtovs[-1])
+            processed["yomtov_in"] = active_yt["in"]
+            processed["yomtov_out"] = active_yt["out"]
+        else:
+            processed["yomtov_in"] = None
+            processed["yomtov_out"] = None
+
+    def _add_manual_event(self, processed: dict, event_type: str, event_time: datetime.datetime, havdalah_minutes: int):
+        """Append manual backup events with localized text based on settings."""
+        is_hebrew = CoordinatorHelpers.is_hebrew(self.language)
+
+        if event_type == "havdalah":
+            title = "הבדלה - ידני" if is_hebrew else "Havdalah - Manual"
+            hebrew_text = f"הבדלה - {havdalah_minutes} דקות"
+        else:
+            title = "הדלקת נרות - ידני" if is_hebrew else "Candle lighting - Manual"
+            hebrew_text = "הדלקת נרות"
+            
         processed["events"].append({
             "className": event_type,
-            "hebrew": hebrew,
+            "hebrew": hebrew_text,
             "date": event_time.isoformat(),
             "allDay": False,
             "title": title,
