@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import async_track_point_in_time
- 
+
 from .const import (
     DOMAIN,
     VERSION,
@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_TIME_AFTER_CHECK,
 )
 from .coordinator import HebcalDataUpdateCoordinator
+from .helpers import CoordinatorHelpers
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -188,7 +189,6 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
             
         return None, None
 
-    # --- פונקציות עזר בטוחות לטיפול בתאריכים ---
     def _ensure_datetime(self, dt: Any) -> Optional[datetime.datetime]:
         """Ensure the variable is a datetime object."""
         if not dt: return None
@@ -212,7 +212,6 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
         dt_obj = self._ensure_datetime(dt)
         if dt_obj: return dt_obj.isoformat()
         return str(dt) if dt else ""
-    # --------------------------------------------
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -242,25 +241,24 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     def _get_shabbat_attributes(self) -> Dict[str, Any]:
         attributes = {}
-        
         shabbat_in = self.coordinator.data.get("shabbat_in")
         shabbat_out = self.coordinator.data.get("shabbat_out")
         
         if shabbat_in:
+            dt_in = self._ensure_datetime(shabbat_in)
             attributes["shabbat_in"] = self._safe_isoformat(shabbat_in)
             attributes["candle_lighting"] = self._safe_strftime(shabbat_in, "%H:%M")
-            attributes["candle_lighting_day"] = self._safe_strftime(shabbat_in, "%A")
-            dt_in = self._ensure_datetime(shabbat_in)
+            attributes["candle_lighting_day"] = CoordinatorHelpers.get_localized_day(dt_in, self.language)
             if dt_in:
                 start_time = dt_in - datetime.timedelta(minutes=self.time_before_check)
                 attributes["active_from"] = start_time.isoformat()
                 attributes["active_from_time"] = start_time.strftime("%H:%M")
             
         if shabbat_out:
+            dt_out = self._ensure_datetime(shabbat_out)
             attributes["shabbat_out"] = self._safe_isoformat(shabbat_out)
             attributes["havdalah"] = self._safe_strftime(shabbat_out, "%H:%M")
-            attributes["havdalah_day"] = self._safe_strftime(shabbat_out, "%A")
-            dt_out = self._ensure_datetime(shabbat_out)
+            attributes["havdalah_day"] = CoordinatorHelpers.get_localized_day(dt_out, self.language)
             if dt_out:
                 end_time = dt_out + datetime.timedelta(minutes=self.time_after_check)
                 attributes["active_until"] = end_time.isoformat()
@@ -285,34 +283,33 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
                 attributes["time_until_candles"] = self.coordinator.format_time_delta(time_until_start)
                 attributes["minutes_until_candles"] = int(time_until_start.total_seconds() / 60)
         
-        if self.is_on:
-            attributes["status_hebrew"] = "שבת קודש"
+        if CoordinatorHelpers.is_hebrew(self.language):
+            attributes["status"] = "שבת קודש" if self.is_on else "יום חול"
         else:
-            attributes["status_hebrew"] = "יום חול"
+            attributes["status"] = "Shabbat" if self.is_on else "Weekday"
             
         return attributes
 
     def _get_yomtov_attributes(self) -> Dict[str, Any]:
         attributes = {}
-        
         yomtov_in = self.coordinator.data.get("yomtov_in")
         yomtov_out = self.coordinator.data.get("yomtov_out")
         
         if yomtov_in:
+            dt_in = self._ensure_datetime(yomtov_in)
             attributes["yomtov_in"] = self._safe_isoformat(yomtov_in)
             attributes["candle_lighting"] = self._safe_strftime(yomtov_in, "%H:%M")
-            attributes["candle_lighting_day"] = self._safe_strftime(yomtov_in, "%A")
-            dt_in = self._ensure_datetime(yomtov_in)
+            attributes["candle_lighting_day"] = CoordinatorHelpers.get_localized_day(dt_in, self.language)
             if dt_in:
                 start_time = dt_in - datetime.timedelta(minutes=self.time_before_check)
                 attributes["active_from"] = start_time.isoformat()
                 attributes["active_from_time"] = start_time.strftime("%H:%M")
             
         if yomtov_out:
+            dt_out = self._ensure_datetime(yomtov_out)
             attributes["yomtov_out"] = self._safe_isoformat(yomtov_out)
             attributes["havdalah"] = self._safe_strftime(yomtov_out, "%H:%M")
-            attributes["havdalah_day"] = self._safe_strftime(yomtov_out, "%A")
-            dt_out = self._ensure_datetime(yomtov_out)
+            attributes["havdalah_day"] = CoordinatorHelpers.get_localized_day(dt_out, self.language)
             if dt_out:
                 end_time = dt_out + datetime.timedelta(minutes=self.time_after_check)
                 attributes["active_until"] = end_time.isoformat()
@@ -320,40 +317,12 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
         
         yomtov_name = self.coordinator.data.get("yomtov_name")
         if yomtov_name:
-            attributes["yomtov_name"] = yomtov_name
             attributes["holiday_name"] = yomtov_name
         
-        if self.coordinator.data.get("rosh_hashana"):
-            attributes["holiday_type"] = "Rosh Hashana (2 days)"
-            attributes["special_notes"] = "Two-day holiday"
-        elif self.coordinator.data.get("special_holiday"):
-            attributes["holiday_type"] = "Special Holiday"
+        if CoordinatorHelpers.is_hebrew(self.language):
+            attributes["status"] = "יום טוב" if self.is_on else "יום חול"
         else:
-            attributes["holiday_type"] = "Regular Holiday"
-        
-        holiday_count = self.coordinator.data.get("holiday_count", 0)
-        if holiday_count > 0:
-            attributes["holiday_count"] = holiday_count
-        
-        now = datetime.datetime.now()
-        dt_out = self._ensure_datetime(yomtov_out)
-        dt_in = self._ensure_datetime(yomtov_in)
-        
-        if self.is_on and dt_out:
-            time_until_end = self.coordinator.get_time_until_event(dt_out)
-            if time_until_end:
-                attributes["time_until_havdalah"] = self.coordinator.format_time_delta(time_until_end)
-                attributes["minutes_until_havdalah"] = int(time_until_end.total_seconds() / 60)
-        elif not self.is_on and dt_in and dt_in > now:
-            time_until_start = self.coordinator.get_time_until_event(dt_in)
-            if time_until_start:
-                attributes["time_until_candles"] = self.coordinator.format_time_delta(time_until_start)
-                attributes["minutes_until_candles"] = int(time_until_start.total_seconds() / 60)
-        
-        if self.is_on:
-            attributes["status_hebrew"] = "יום טוב"
-        else:
-            attributes["status_hebrew"] = "יום חול"
+            attributes["status"] = "Yom Tov" if self.is_on else "Weekday"
             
         return attributes
 
@@ -362,30 +331,22 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
         period = self.coordinator.isur_melacha_period
         
         if period.get('start'):
+            dt_start = self._ensure_datetime(period['start'])
             attributes["period_start"] = self._safe_isoformat(period['start'])
             attributes["period_start_time"] = self._safe_strftime(period['start'], "%H:%M")
-            attributes["period_start_day"] = self._safe_strftime(period['start'], "%A")
+            attributes["period_start_day"] = CoordinatorHelpers.get_localized_day(dt_start, self.language)
             
         if period.get('end'):
+            dt_end = self._ensure_datetime(period['end'])
             attributes["period_end"] = self._safe_isoformat(period['end'])
             attributes["period_end_time"] = self._safe_strftime(period['end'], "%H:%M")
-            attributes["period_end_day"] = self._safe_strftime(period['end'], "%A")
+            attributes["period_end_day"] = CoordinatorHelpers.get_localized_day(dt_end, self.language)
         
         attributes["period_type"] = period.get('type', 'none')
-        attributes["period_type_hebrew"] = self.coordinator.get_isur_melacha_type_description()
+        attributes["period_type_description"] = period.get('type_description', '')
         attributes["duration_hours"] = period.get('duration_hours', 0)
+        attributes["duration_formatted"] = period.get('duration_formatted', '')
         attributes["is_active"] = period.get('active', False)
-        
-        duration = period.get('duration_hours', 0)
-        if duration > 0:
-            if duration >= 24:
-                days = int(duration // 24)
-                hours = int(duration % 24)
-                attributes["duration_formatted"] = f"{days} days, {hours} hours"
-                attributes["duration_formatted_hebrew"] = f"{days} ימים, {hours} שעות"
-            else:
-                attributes["duration_formatted"] = f"{duration} hours"
-                attributes["duration_formatted_hebrew"] = f"{duration} שעות"
         
         if self.is_on:
             time_until_end = self.coordinator.get_time_until_isur_melacha_end()
@@ -415,29 +376,22 @@ class HebcalBinarySensor(CoordinatorEntity, BinarySensorEntity):
         if yomtov_out:
             attributes["yomtov_havdalah"] = self._safe_strftime(yomtov_out, "%H:%M")
         
-        attributes["status_hebrew"] = self.coordinator.format_isur_melacha_status()
-        
-        special_info = []
-        if self.coordinator.data.get("rosh_hashana"): special_info.append("Rosh Hashana (2 days)")
-        if self.coordinator.data.get("special_holiday"): special_info.append("Special Holiday")
-        if special_info: attributes["special_cases"] = ", ".join(special_info)
+        attributes["status_text"] = period.get('status_text', '')
+        attributes["work_status"] = period.get('work_status', '')
         
         next_candles = self.coordinator.next_candle_lighting
         if next_candles:
-            attributes["next_candle_lighting"] = self._safe_strftime(next_candles, "%A %H:%M")
+            day_str = CoordinatorHelpers.get_localized_day(next_candles, self.language)
+            time_str = self._safe_strftime(next_candles, "%H:%M")
+            attributes["next_candle_lighting"] = f"{day_str} {time_str}"
             attributes["next_candle_lighting_full"] = self._safe_isoformat(next_candles)
             
         next_havdalah = self.coordinator.next_havdalah
         if next_havdalah:
-            attributes["next_havdalah"] = self._safe_strftime(next_havdalah, "%A %H:%M")
+            day_str = CoordinatorHelpers.get_localized_day(next_havdalah, self.language)
+            time_str = self._safe_strftime(next_havdalah, "%H:%M")
+            attributes["next_havdalah"] = f"{day_str} {time_str}"
             attributes["next_havdalah_full"] = self._safe_isoformat(next_havdalah)
-        
-        if self.is_on:
-            attributes["work_status"] = "Prohibited"
-            attributes["work_status_hebrew"] = "אסור לעשות מלאכה"
-        else:
-            attributes["work_status"] = "Permitted"
-            attributes["work_status_hebrew"] = "מותר לעשות מלאכה"
             
         return attributes
 
