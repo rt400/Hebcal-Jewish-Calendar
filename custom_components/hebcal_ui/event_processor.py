@@ -1,6 +1,8 @@
 """Processes and cleans Hebcal API event items and holidays."""
 import datetime
 import unicodedata
+from typing import Dict, Any
+
 from .helpers import CoordinatorHelpers
 
 class EventProcessor:
@@ -12,10 +14,14 @@ class EventProcessor:
         self.language = language
 
     @staticmethod
-    def clean_item_text(item: dict[str, any]) -> dict[str, any]:
-        """Strip Hebrew vowels (Nikud) from API textual data items recursively."""
+    def clean_item_text(item: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recursively strip Hebrew vowels (Nikud) from API textual data items 
+        to ensure clean rendering in Home Assistant UI.
+        """
         if not isinstance(item, dict):
             return item
+            
         cleaned = {}
         for key, value in item.items():
             if isinstance(value, str):
@@ -34,8 +40,11 @@ class EventProcessor:
                 cleaned[key] = value
         return cleaned
 
-    def process_hebcal_item(self, item: dict[str, any], processed: dict[str, any]):
-        """Process and categorize individual items returned from Hebcal API payload."""
+    def process_hebcal_item(self, item: Dict[str, Any], processed: Dict[str, Any]) -> None:
+        """
+        Process, categorize, and route individual items returned from the Hebcal API payload.
+        Sets boolean flags for Home Assistant sensors (e.g., special_holiday).
+        """
         if not item or not isinstance(item, dict):
             return
 
@@ -45,80 +54,117 @@ class EventProcessor:
 
         title_orig = item.get("title_orig", "")
         title = item.get("title", "")
-        if "Rosh Hashana" in title_orig or "Rosh Hashana" in title or "ראש השנה" in title_orig:
-            processed["rosh_hashana"] = True
-
+        
+        # Ensure date string is standardized to max 19 chars (YYYY-MM-DDTHH:MM:SS)
         if "date" in item:
             item["date"] = item["date"][:19]
+            
+        item_date = item.get("date", "")
+        
+        # Determine if the current API event falls on today's date
+        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        is_today = item_date.startswith(today_str)
 
-        if category in ["candles", "havdalah", "parashat", "yomtov", "holiday", "omer", "roshchodesh", "mevarchim"]:
+        # ---------------------------------------------------------
+        # BUG FIX: Properly flag special holidays (like Rosh Chodesh) 
+        # so HA sensors know to display them when they occur today.
+        # ---------------------------------------------------------
+        if is_today and category in ["holiday", "yomtov", "roshchodesh", "mevarchim"]:
+            if "Rosh Hashana" in title_orig or "Rosh Hashana" in title or "ראש השנה" in title_orig:
+                processed["rosh_hashana"] = True
+            else:
+                processed["special_holiday"] = True
+
+        valid_categories = [
+            "candles", "havdalah", "parashat", "yomtov", 
+            "holiday", "omer", "roshchodesh", "mevarchim"
+        ]
+        
+        if category in valid_categories:
+            # Extract Parasha (Weekly Torah Portion) if the event falls on a Saturday
             if category == "parashat":
                 try:
-                    item_date = datetime.datetime.fromisoformat(item["date"][:19]).date()
-                    if item_date.weekday() == 5:
-                        processed["parasha"] = item.get("title")
+                    item_dt = datetime.datetime.fromisoformat(item_date).date()
+                    if item_dt.weekday() == 5:  # Saturday
+                        processed["parasha"] = title
                     elif not processed.get("parasha"):
-                        processed["parasha"] = item.get("title")
+                        processed["parasha"] = title
                 except Exception:
                     pass
 
+            # Inject calculated sunset boundaries for holidays missing explicit times
             if category in ["yomtov", "holiday"]:
-                item["start"] = self.zmanim_calc.sunset_time_str(item["date"], -1)
-                item["end"] = self.zmanim_calc.sunset_time_str(item["date"], 0)
+                item["start"] = self.zmanim_calc.sunset_time_str(item_date, -1)
+                item["end"] = self.zmanim_calc.sunset_time_str(item_date, 0)
+                
+                # Only register as a strict 'Yom Tov' (Work Prohibition) if flagged by the API
                 if item.get("yomtov"):
                     processed["holidays"].append({
-                        "name": item.get("title"),
-                        "date": item.get("date")[:10],
+                        "name": title,
+                        "date": item_date[:10],
                         "start": item.get("start"),
                         "end": item.get("end"),
                         "yomtov_in": None,
                         "yomtov_out": None
                     })
+                    
+            # Always append the valid item to the events array for the HA sensor
             processed["events"].append(item)
 
-    def complete_missing_times(self, processed: dict[str, any], havdalah_minutes: int, candle_minutes: int):
-        """Fill in missing candle lighting and havdalah times for holidays and shabbat."""
+    def complete_missing_times(self, processed: Dict[str, Any], havdalah_minutes: int, candle_minutes: int) -> None:
+        """
+        Scan the processed events array and fill in missing candle lighting 
+        and havdalah times for holidays and shabbat using the local offline calculator.
+        """
         now = datetime.datetime.now()
         events_to_add = {}
 
-        def add_manual(dt: datetime.datetime, cat: str):
-            key = (dt.isoformat(), cat)
+        def add_manual(dt_obj: datetime.datetime, cat: str):
+            """Helper to append locally calculated fallback events."""
+            key = (dt_obj.isoformat(), cat)
             if key not in events_to_add:
                 events_to_add[key] = True
-                self._add_manual_event(processed, cat, dt, havdalah_minutes)
+                self._add_manual_event(processed, cat, dt_obj, havdalah_minutes)
 
         api_candles = {}
         api_havdalahs = {}
+        
+        # Map existing API events for quick lookup
         for ev in processed.get("events", []):
             cat = ev.get("category")
             if cat not in ["candles", "havdalah"]:
                 continue
+                
             ev_date = ev.get("date", "")[:10]
-            dt = datetime.datetime.fromisoformat(ev["date"][:19])
+            dt_obj = datetime.datetime.fromisoformat(ev["date"][:19])
             if cat == "candles":
-                api_candles[ev_date] = dt
+                api_candles[ev_date] = dt_obj
             else:
-                api_havdalahs[ev_date] = dt
+                api_havdalahs[ev_date] = dt_obj
 
+        # Process Yom Tov times
         sorted_holidays = sorted(processed.get("holidays", []), key=lambda h: h["date"])
         for i, holiday in enumerate(sorted_holidays):
             h_date = datetime.datetime.fromisoformat(holiday["date"][:10]).date()
             eve_date = h_date - datetime.timedelta(days=1)
 
+            # Determine entry time
             y_in = api_candles.get(eve_date.isoformat()) or api_candles.get(h_date.isoformat())
             if y_in:
                 holiday["yomtov_in"] = y_in
             else:
                 y_in = self.zmanim_calc.get_offline_missing_time(h_date, "candles", -1)
                 holiday["yomtov_in"] = y_in
-                if y_in: add_manual(y_in, "candles")
+                if y_in: 
+                    add_manual(y_in, "candles")
 
+            # Check for contiguous holidays (e.g., Diaspora 2-day Yom Tov)
             has_next_holiday = (i + 1 < len(sorted_holidays)) and \
-                               (datetime.datetime.fromisoformat(
-                                   sorted_holidays[i + 1]["date"][:10]).date() == h_date + datetime.timedelta(days=1))
+                               (datetime.datetime.fromisoformat(sorted_holidays[i + 1]["date"][:10]).date() == h_date + datetime.timedelta(days=1))
 
             y_out = api_havdalahs.get(h_date.isoformat())
 
+            # Determine exit time
             if y_out:
                 holiday["yomtov_out"] = y_out
             elif has_next_holiday:
@@ -128,12 +174,15 @@ class EventProcessor:
                 else:
                     calc_out = self.zmanim_calc.get_offline_missing_time(h_date, "candles", 0)
                     holiday["yomtov_out"] = calc_out
-                    if calc_out: add_manual(calc_out, "candles")
+                    if calc_out: 
+                        add_manual(calc_out, "candles")
             else:
                 calc_out = self.zmanim_calc.get_offline_missing_time(h_date, "havdalah", 0)
                 holiday["yomtov_out"] = calc_out
-                if calc_out: add_manual(calc_out, "havdalah")
+                if calc_out: 
+                    add_manual(calc_out, "havdalah")
 
+        # Process Shabbat times
         shabbats = []
         if processed.get("events"):
             any_date = datetime.datetime.fromisoformat(processed["events"][0]["date"][:19]).date()
@@ -141,29 +190,34 @@ class EventProcessor:
             friday_date = any_date + datetime.timedelta(days=days_to_friday)
             saturday_date = friday_date + datetime.timedelta(days=1)
 
+            # Determine Shabbat entry
             s_in = api_candles.get(friday_date.isoformat())
             if not s_in:
                 s_in = self.zmanim_calc.get_offline_missing_time(friday_date, "candles", 0)
-                if s_in: add_manual(s_in, "candles")
+                if s_in: 
+                    add_manual(s_in, "candles")
 
+            # Determine Shabbat exit
             s_out = api_havdalahs.get(saturday_date.isoformat())
             if not s_out:
                 sunday_date = saturday_date + datetime.timedelta(days=1)
-                is_sunday_holiday = any(
-                    h["date"][:10] == sunday_date.isoformat() for h in processed.get("holidays", []))
+                is_sunday_holiday = any(h["date"][:10] == sunday_date.isoformat() for h in processed.get("holidays", []))
 
                 if is_sunday_holiday:
                     s_out = api_candles.get(saturday_date.isoformat())
                     if not s_out:
                         s_out = self.zmanim_calc.get_offline_missing_time(saturday_date, "candles", 0)
-                        if s_out: add_manual(s_out, "candles")
+                        if s_out: 
+                            add_manual(s_out, "candles")
                 else:
                     s_out = self.zmanim_calc.get_offline_missing_time(saturday_date, "havdalah", 0)
-                    if s_out: add_manual(s_out, "havdalah")
+                    if s_out: 
+                        add_manual(s_out, "havdalah")
 
             if s_in and s_out:
                 shabbats.append({"in": s_in, "out": s_out})
 
+        # Identify active or next Shabbat
         if shabbats:
             active_shabbat = next((s for s in shabbats if s["in"] <= now <= s["out"]), None)
             if not active_shabbat:
@@ -174,7 +228,10 @@ class EventProcessor:
             processed["shabbat_in"] = None
             processed["shabbat_out"] = None
 
-        raw_yomtovs = [{"in": h["yomtov_in"], "out": h["yomtov_out"]} for h in processed.get("holidays", []) if h.get("yomtov_in") and h.get("yomtov_out")]
+        # Merge contiguous Yom Tovs based on temporal proximity (less than 3 hours gap)
+        raw_yomtovs = [{"in": h["yomtov_in"], "out": h["yomtov_out"]} 
+                       for h in processed.get("holidays", []) 
+                       if h.get("yomtov_in") and h.get("yomtov_out")]
         raw_yomtovs.sort(key=lambda x: x["in"])
         
         merged_yomtovs = []
@@ -191,6 +248,7 @@ class EventProcessor:
         if current_yt:
             merged_yomtovs.append(current_yt)
 
+        # Identify active or next Yom Tov
         if merged_yomtovs:
             active_yt = next((y for y in merged_yomtovs if y["in"] <= now <= y["out"]), None)
             if not active_yt:
@@ -201,8 +259,11 @@ class EventProcessor:
             processed["yomtov_in"] = None
             processed["yomtov_out"] = None
 
-    def _add_manual_event(self, processed: dict, event_type: str, event_time: datetime.datetime, havdalah_minutes: int):
-        """Append manual backup events with localized text based on settings."""
+    def _add_manual_event(self, processed: Dict[str, Any], event_type: str, event_time: datetime.datetime, havdalah_minutes: int) -> None:
+        """
+        Append locally calculated fallback events (Havdalah/Candles) to the events array 
+        with localized text based on the user's language settings.
+        """
         is_hebrew = CoordinatorHelpers.is_hebrew(self.language)
 
         if event_type == "havdalah":
