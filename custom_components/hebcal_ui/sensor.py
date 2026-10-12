@@ -191,8 +191,13 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
         if not self.coordinator.data:
             return {}
 
+        # אם זה חיישן זמנים, שלוף את תכונות הזמנים
         if self.sensor_type == "zmanim":
             return self._get_zmanim_attributes()
+            
+        # אם זה חיישן האירועים, שלוף את כל פרטי האירוע מה-DB!
+        if self.sensor_type == "event_name":
+            return self._get_event_name_attributes()
             
         attributes = {}
         
@@ -220,6 +225,44 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
                     attributes["time"] = self._format_time(dt_val)
                     attributes["day"] = CoordinatorHelpers.get_localized_day(dt_val, self.language)
                     
+        return attributes
+
+    def _get_event_name_attributes(self) -> Dict[str, Any]:
+        """Get all raw details of today's events as attributes."""
+        events = self.coordinator.data.get("events", [])
+        if not events:
+            return {}
+
+        now = datetime.datetime.now()
+        today_iso = now.date().isoformat()
+        
+        valid_categories = ["roshchodesh", "holiday", "mevarchim"]
+        attributes = {}
+        today_events = []
+
+        # מאתרים את כל האירועים שקורים היום
+        for event in events:
+            event_date = event.get("date", "")
+            category = event.get("category", "")
+            
+            if event_date.startswith(today_iso) and category in valid_categories:
+                today_events.append(event)
+
+        if not today_events:
+            return {}
+
+        # אם יש אירוע אחד (למשל רק ראש חודש), שופכים את כל הפרטים שלו פנימה
+        if len(today_events) == 1:
+            for key, value in today_events[0].items():
+                if key not in ["date", "category"]: # אין טעם להציג את זה שוב
+                    attributes[key] = value
+        # אם יש כמה אירועים באותו יום (למשל גם פורים וגם משהו נוסף), ממספרים אותם
+        else:
+            for i, event in enumerate(today_events, 1):
+                for key, value in event.items():
+                    if key not in ["date", "category"]:
+                        attributes[f"event_{i}_{key}"] = value
+
         return attributes
 
     def _get_shabbat_in(self) -> str:
@@ -451,3 +494,36 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             else:
                 return dt.strftime("%H:%M")
         return str(dt)
+        
+    def _get_event_name(self) -> str:
+        """Get today's event name (e.g., Rosh Chodesh, Chanukah)."""
+        events = self.coordinator.data.get("events", [])
+        if not events:
+            return self._get_lang_text("no_event", "No Event Today")
+
+        now = datetime.datetime.now()
+        today_iso = now.date().isoformat()
+        
+        # Categories we want to display in the standard "Event" sensor
+        valid_categories = ["roshchodesh", "holiday", "mevarchim"]
+        today_events = []
+
+        for event in events:
+            event_date = event.get("date", "")
+            category = event.get("category", "")
+            
+            # Check if the event falls on today's date and is a valid category
+            if event_date.startswith(today_iso) and category in valid_categories:
+                # Prioritize Hebrew text if Hebrew is selected
+                if CoordinatorHelpers.is_hebrew(self.language):
+                    event_title = event.get("hebrew") or event.get("title")
+                else:
+                    event_title = event.get("title")
+                    
+                if event_title and event_title not in today_events:
+                    today_events.append(event_title)
+
+        if today_events:
+            return ", ".join(today_events)
+            
+        return self._get_lang_text("no_event", "No Event Today")
