@@ -4,7 +4,7 @@ import os
 from datetime import timedelta
 from typing import Final
 
-# --- שאיבת הגרסה באופן דינמי מקובץ manifest.json ---
+# --- Dynamically load version from manifest.json ---
 try:
     dir_path = os.path.dirname(os.path.realpath(__file__))
     manifest_path = os.path.join(dir_path, "manifest.json")
@@ -15,9 +15,9 @@ except Exception:
     VERSION: Final = "unknown"
 
 DOMAIN: Final = "hebcal_ui"
-UPDATE_INTERVAL: Final = timedelta(minutes=30)  # עדכון כל 30 דקות
-FULL_UPDATE_INTERVAL: Final = timedelta(hours=6)  # עדכון מלא כל 6 שעות
-IMPORTANT_TIME_BUFFER: Final = timedelta(minutes=30)  # חיץ זמן לאירועים חשובים
+UPDATE_INTERVAL: Final = timedelta(minutes=30)  # Update every 30 minutes
+FULL_UPDATE_INTERVAL: Final = timedelta(hours=6)  # Full API refresh every 6 hours
+IMPORTANT_TIME_BUFFER: Final = timedelta(minutes=30)  # Time buffer for important events
 
 # Configuration keys
 CONF_HAVDALAH_MINUTES: Final = "havdalah_minutes"
@@ -29,6 +29,7 @@ CONF_DIASPORA: Final = "diaspora"
 CONF_USE_12H_TIME: Final = "use_12h_time"
 CONF_OMER_COUNT_TYPE: Final = "omer_count_type"
 CONF_LANGUAGE: Final = "language"
+CONF_OFFLINE_MODE: Final = "offline_mode"
 
 # Default values
 DEFAULT_HAVDALAH_MINUTES: Final = 42
@@ -40,6 +41,7 @@ DEFAULT_DIASPORA: Final = False
 DEFAULT_OMER_COUNT_TYPE: Final = 0
 DEFAULT_USE_12H_TIME: Final = False
 DEFAULT_LANGUAGE: Final = "hebrew"
+DEFAULT_OFFLINE_MODE: Final = False
 
 # API URLs
 HEBCAL_DATE_URL: Final = (
@@ -66,6 +68,7 @@ ENTITY_ID_MAP = {
     "omer_day": "omer_count",
     "hebrew_date": "hebrew_date",
     "zmanim": "halachic_times",
+    "data_source": "data_source",  # <--- הוספנו את המיפוי לחיישן ה-DB
     "is_shabbat": "is_shabbat",
     "is_yomtov": "is_yom_tov",
 }
@@ -139,6 +142,13 @@ SENSOR_TYPES = {
         "entity_id": "halachic_times",
         "name": {"hebrew": "זמנים הלכתיים", "english": "Halachic Times"},
         "icon": "mdi:clock-outline",
+        "device_class": None,
+        "unit": None,
+    },
+    "data_source": {  # <--- הוספנו את החיישן החדש לכאן
+        "entity_id": "data_source",
+        "name": {"hebrew": "מקור נתונים", "english": "Data Source"},
+        "icon": "mdi:database-sync",
         "device_class": None,
         "unit": None,
     },
