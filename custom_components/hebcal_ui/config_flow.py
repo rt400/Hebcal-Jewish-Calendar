@@ -21,6 +21,7 @@ from .const import (
     CONF_DIASPORA,
     CONF_USE_12H_TIME,
     CONF_OMER_COUNT_TYPE,
+    CONF_OFFLINE_MODE,
     DEFAULT_LANGUAGE,
     DEFAULT_HAVDALAH_MINUTES,
     DEFAULT_TIME_BEFORE_CHECK,
@@ -30,6 +31,7 @@ from .const import (
     DEFAULT_DIASPORA,
     DEFAULT_USE_12H_TIME,
     DEFAULT_OMER_COUNT_TYPE,
+    DEFAULT_OFFLINE_MODE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +39,16 @@ _LOGGER = logging.getLogger(__name__)
 LANGUAGE_CHOICES = {
     "hebrew": "Hebrew - עברית (Native Hebrew event names)",
     "english": "English (Transliterated event names)",
+}
+
+OFFLINE_MODE_MAP = {
+    "online": False,
+    "offline": True,
+}
+
+OFFLINE_MODE_REVERSE_MAP = {
+    False: "online",
+    True: "offline",
 }
 
 OMER_COUNT_TYPE_MAP = {
@@ -124,6 +136,11 @@ class HebcalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 user_input[CONF_OMER_COUNT_TYPE] = OMER_COUNT_TYPE_MAP[
                     user_input[CONF_OMER_COUNT_TYPE]
                 ]
+            
+            if CONF_OFFLINE_MODE in user_input:
+                user_input[CONF_OFFLINE_MODE] = OFFLINE_MODE_MAP.get(
+                    user_input[CONF_OFFLINE_MODE], DEFAULT_OFFLINE_MODE
+                )
 
             self.data.update(user_input)
 
@@ -143,35 +160,67 @@ class HebcalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="settings",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
+                    vol.Required(
+                        CONF_OFFLINE_MODE,
+                        default=OFFLINE_MODE_REVERSE_MAP[DEFAULT_OFFLINE_MODE],
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=list(OFFLINE_MODE_MAP.keys()),
+                            translation_key="offline_mode",
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    
+                    # שימוש ב־NumberSelector מודרני במקום vol.Range
+                    vol.Required(
                         CONF_HAVDALAH_MINUTES,
                         default=DEFAULT_HAVDALAH_MINUTES,
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
-                    vol.Optional(
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1, max=120, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_TIME_BEFORE_CHECK,
                         default=DEFAULT_TIME_BEFORE_CHECK,
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
-                    vol.Optional(
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=60, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_TIME_AFTER_CHECK,
                         default=DEFAULT_TIME_AFTER_CHECK,
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
-                    vol.Optional(
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=60, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    # שינוי ל־Required כדי להעיף תיבות סימון במקומות שלא צריך
+                    vol.Required(
                         CONF_JERUSALEM_CANDLE,
                         default=DEFAULT_JERUSALEM_CANDLE,
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_TZEIT_HAKOCHAVIM,
                         default=DEFAULT_TZEIT_HAKOCHAVIM,
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_DIASPORA,
                         default=DEFAULT_DIASPORA,
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_USE_12H_TIME,
                         default=DEFAULT_USE_12H_TIME,
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_OMER_COUNT_TYPE,
                         default=OMER_COUNT_TYPE_REVERSE_MAP[
                             DEFAULT_OMER_COUNT_TYPE
@@ -180,6 +229,7 @@ class HebcalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.SelectSelectorConfig(
                             options=list(OMER_COUNT_TYPE_MAP.keys()),
                             translation_key="omer_count_type",
+                            mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
                 }
@@ -205,6 +255,12 @@ class HebcalOptionsFlowHandler(config_entries.OptionsFlow):
                 user_input[CONF_OMER_COUNT_TYPE] = OMER_COUNT_TYPE_MAP[
                     user_input[CONF_OMER_COUNT_TYPE]
                 ]
+            
+            if CONF_OFFLINE_MODE in user_input:
+                user_input[CONF_OFFLINE_MODE] = OFFLINE_MODE_MAP.get(
+                    user_input[CONF_OFFLINE_MODE], DEFAULT_OFFLINE_MODE
+                )
+                
             return self.async_create_entry(title="", data=user_input)
 
         def get_value(key, default):
@@ -212,67 +268,80 @@ class HebcalOptionsFlowHandler(config_entries.OptionsFlow):
                 key, self.config_entry.data.get(key, default)
             )
 
-        current_omer = get_value(
-            CONF_OMER_COUNT_TYPE, DEFAULT_OMER_COUNT_TYPE
-        )
+        current_omer = get_value(CONF_OMER_COUNT_TYPE, DEFAULT_OMER_COUNT_TYPE)
+        current_offline_mode = get_value(CONF_OFFLINE_MODE, DEFAULT_OFFLINE_MODE)
+        lang = get_value(CONF_LANGUAGE, DEFAULT_LANGUAGE)
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required(
+                        CONF_OFFLINE_MODE,
+                        default=OFFLINE_MODE_REVERSE_MAP.get(
+                            current_offline_mode, "online"
+                        ),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=list(OFFLINE_MODE_MAP.keys()),
+                            translation_key="offline_mode",
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_LANGUAGE,
-                        default=get_value(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+                        default=lang,
                     ): vol.In(LANGUAGE_CHOICES),
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_HAVDALAH_MINUTES,
-                        default=get_value(
-                            CONF_HAVDALAH_MINUTES,
-                            DEFAULT_HAVDALAH_MINUTES,
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=120)),
-                    vol.Optional(
+                        default=get_value(CONF_HAVDALAH_MINUTES, DEFAULT_HAVDALAH_MINUTES),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1, max=120, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_TIME_BEFORE_CHECK,
-                        default=get_value(
-                            CONF_TIME_BEFORE_CHECK,
-                            DEFAULT_TIME_BEFORE_CHECK,
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
-                    vol.Optional(
+                        default=get_value(CONF_TIME_BEFORE_CHECK, DEFAULT_TIME_BEFORE_CHECK),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=60, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_TIME_AFTER_CHECK,
-                        default=get_value(
-                            CONF_TIME_AFTER_CHECK,
-                            DEFAULT_TIME_AFTER_CHECK,
-                        ),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=60)),
-                    vol.Optional(
+                        default=get_value(CONF_TIME_AFTER_CHECK, DEFAULT_TIME_AFTER_CHECK),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0, max=60, step=1, mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    
+                    vol.Required(
                         CONF_JERUSALEM_CANDLE,
-                        default=get_value(
-                            CONF_JERUSALEM_CANDLE,
-                            DEFAULT_JERUSALEM_CANDLE,
-                        ),
+                        default=get_value(CONF_JERUSALEM_CANDLE, DEFAULT_JERUSALEM_CANDLE),
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_TZEIT_HAKOCHAVIM,
-                        default=get_value(
-                            CONF_TZEIT_HAKOCHAVIM,
-                            DEFAULT_TZEIT_HAKOCHAVIM,
-                        ),
+                        default=get_value(CONF_TZEIT_HAKOCHAVIM, DEFAULT_TZEIT_HAKOCHAVIM),
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_DIASPORA,
-                        default=get_value(
-                            CONF_DIASPORA, DEFAULT_DIASPORA
-                        ),
+                        default=get_value(CONF_DIASPORA, DEFAULT_DIASPORA),
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_USE_12H_TIME,
-                        default=get_value(
-                            CONF_USE_12H_TIME,
-                            DEFAULT_USE_12H_TIME,
-                        ),
+                        default=get_value(CONF_USE_12H_TIME, DEFAULT_USE_12H_TIME),
                     ): bool,
-                    vol.Optional(
+                    
+                    vol.Required(
                         CONF_OMER_COUNT_TYPE,
                         default=OMER_COUNT_TYPE_REVERSE_MAP.get(
                             current_omer,
@@ -282,6 +351,7 @@ class HebcalOptionsFlowHandler(config_entries.OptionsFlow):
                         selector.SelectSelectorConfig(
                             options=list(OMER_COUNT_TYPE_MAP.keys()),
                             translation_key="omer_count_type",
+                            mode=selector.SelectSelectorMode.DROPDOWN,
                         )
                     ),
                 }
