@@ -29,6 +29,7 @@
         "title": "Hebcal Jewish Calendar - Advanced Settings",
         "description": "Configure additional settings for Jewish calendar calculations and display preferences.",
         "data": {
+          "offline_mode": "Data Connection Mode",
           "havdalah_minutes": "Havdalah Minutes",
           "time_before_check": "Minutes Before Shabbat/Holiday Entrance",
           "time_after_check": "Minutes After Shabbat/Holiday End", 
@@ -39,6 +40,7 @@
           "omer_count_type": "Omer Count Style"
         },
         "data_description": {
+          "offline_mode": "Choose whether to connect to the online server with automatic local fallback, or run strictly offline.",
           "havdalah_minutes": "Minutes after sunset for Havdalah. Common customs: 42 (Geonim), 50 (Jerusalem), 72 (Rabbeinu Tam).",
           "time_before_check": "Buffer in minutes to activate sensors before Shabbat/Holiday entrance.",
           "time_after_check": "Buffer in minutes to keep sensors active after Shabbat/Holiday end.",
@@ -73,6 +75,7 @@
         "title": "Hebcal Jewish Calendar - Options",
         "description": "Modify settings for your Hebcal Jewish Calendar integration.",
         "data": {
+          "offline_mode": "Data Connection Mode",
           "language": "Language",
           "havdalah_minutes": "Havdalah Minutes",
           "time_before_check": "Minutes Before Shabbat/Holiday Entrance",
@@ -84,6 +87,7 @@
           "omer_count_type": "Omer Count Style"
         },
         "data_description": {
+          "offline_mode": "Choose whether to connect to the online server with automatic local fallback, or run strictly offline.",
           "language": "Language for displaying event names and calendar information.",
           "havdalah_minutes": "Minutes after sunset for Havdalah. Common customs: 42 (Geonim), 50 (Jerusalem), 72 (Rabbeinu Tam).",
           "time_before_check": "Buffer in minutes to activate sensors before Shabbat/Holiday entrance.",
@@ -104,6 +108,12 @@
     }
   },
   "selector": {
+    "offline_mode": {
+      "options": {
+        "online": "Online (Recommended) - Server sync with automatic local fallback",
+        "offline": "Offline Only - Fully independent calculation from a local database"
+      }
+    },
     "omer_count_type": {
       "options": {
         "omer_count_yemenite": "Yemenite Custom",
