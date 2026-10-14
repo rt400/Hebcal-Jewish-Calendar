@@ -380,6 +380,21 @@ class HebcalSensor(CoordinatorEntity, SensorEntity):
             return yomtov_name
             
         return self._get_lang_text("no_info", "No info")
+        
+    def _get_data_source(self) -> str:
+        """Get the current data source beautifully translated."""
+        source = self.coordinator.data.get("data_source", "")
+        
+        # בודק אם השפה של המשתמש היא עברית
+        is_hebrew = self.language == "hebrew"
+        
+        if source == "offline_engine":
+            return "בסיס נתונים מקומי" if is_hebrew else "Local Database"
+            
+        elif source == "online_api":
+            return "בסיס נתונים מקוון" if is_hebrew else "Online Database"
+            
+        return "לא ידוע" if is_hebrew else "Unknown"
 
     def _get_omer_day(self) -> str:
         if not self.coordinator.data:
